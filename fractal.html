@@ -1,0 +1,381 @@
+
+<!doctype HTML>
+<html>
+<head>
+<title></title>
+<style>
+body{
+color:white;
+}
+canvas{
+position:relative;
+}
+#can0{
+border:2px solid #333;
+}
+
+#display{
+z-index:2;
+position:relative;
+font-family: menlo, sans-serif;
+color:#0f0;
+left:400px;
+bottom:140px;
+}
+
+#display td{
+background-color: black;
+width:99px;
+padding:0px;
+border-radius:4px;
+text-align:center;
+}
+#display_x,#display_y,#display_z{
+height:75px;
+font-size:1.5em;
+}
+.check{
+vertical-align:top;
+
+}
+.colorbox{
+width:12px;
+height:12px;
+display:inline-block;
+}
+</style>
+</head>
+<body bgcolor="#222222" onload="init()">
+<div id="canholder">
+</div>
+<button onclick="play()">Play</button><button onclick="pause()">Pause</button><br>
+Vector Step Size <input visible="false" type="text" size="10" id="input1" value="0.5"><br>
+Move Speed <input type="text" size="10" id="input2" value="1"><br>
+Fractal Order <input type="text" size="10" id="input3" value="3"><br>
+<button onclick="updateInputs()">Update</button>
+<table hidden="true">
+<tr>
+<td>Color 1 RGB</td>
+<td><input type="text" size="3" id="r1" value="202" onchange="updateColors()"></td>
+<td><input type="text" size="3" id="g1" value="10" onchange="updateColors()"></td>
+<td><input type="text" size="3" id="b1" value="50" onchange="updateColors()"></td>
+<td><span class="colorbox"></span></td>
+</tr>
+<tr>
+<td>Color 2 RGB</td>
+<td><input type="text" size="3" id="r2" value="120" onchange="updateColors()"></td>
+<td><input type="text" size="3" id="g2" value="10" onchange="updateColors()"></td>
+<td><input type="text" size="3" id="b2" value="210" onchange="updateColors()"></td>
+<td><span class="colorbox"></span></td>
+</tr>
+</table>
+<script type="text/javascript" src="https://cdn.rawgit.com/gpujs/gpu.js/45103b7f154a12ec639990c6896b21a053eb6a6c/bin/gpu.js"></script>
+<script type="text/javascript">
+var canW=600;
+var canH=600;
+var key={up:false,down:false,left:false,right:false,space:false,shift:false,a:false,s:false,w:false,z:false,x:false,n2:false};
+var fps=30;
+var pixelsize;
+var renderdist=400;
+var fractalorder;
+var widen=true;
+var movedistance, dt;
+
+var animate;
+
+var eye={x:10,y:20,z:-100,speed:0,strafespeed:0,
+xang:0,yang:0,zang:0,
+xangvel:0,yangvel:0,zangvel:0,vector:[],hvec:[],vvec:[],
+move(){
+	if(key.w){
+			eye.speed=movedistance;
+			
+		}else if(key.s){
+			eye.speed=-movedistance;
+			
+		}else{
+			eye.speed=0;
+		}
+		if(key.a && !key.d){
+			eye.strafespeed=-movedistance;
+		}else if (key.d){
+			eye.strafespeed=movedistance;
+		}else{
+			eye.strafespeed=0;
+		}
+		if(key.q){
+			eye.yang-=Math.PI/120;
+		}
+		if(key.e){
+			eye.yang+=Math.PI/120;
+		}
+		if(key.x && eye.xang-Math.PI/120>-Math.PI/2){
+			eye.xang-=Math.PI/120;
+		}
+		if(key.n2 && eye.xang+Math.PI/120<Math.PI/2){
+			eye.xang+=Math.PI/120;
+		}
+		eye.x+=eye.speed*Math.sin(eye.yang)*Math.cos(eye.xang) + eye.strafespeed*Math.cos(eye.yang)*Math.cos(eye.xang);
+		eye.y+=eye.speed*Math.sin(eye.xang);
+		eye.z+=eye.speed*Math.cos(eye.yang)*Math.cos(eye.xang) - eye.strafespeed*Math.sin(eye.yang)*Math.cos(eye.xang);
+},
+	getVectors(){
+		this.vector= [Math.sin(this.yang)*Math.cos(this.xang),Math.sin(this.xang), Math.cos(this.yang)*Math.cos(this.xang)];
+		//this.hvec=crossProduct([0,1,0],this.vector);
+		this.hvec=[Math.cos(this.yang),0,-Math.sin(this.yang)];
+		this.vvec=crossProduct(this.vector,this.hvec);
+	}
+};
+var MX,MY;
+
+function anglemod(a){//returns angle in [-pi,pi)
+return ((a+Math.PI)%(2*Math.PI)-Math.PI*(Math.sign(a+Math.PI)||1));
+}
+
+var offset;
+
+function kdown(e){
+	var event=window.event ? window.event : e;
+	//if(event.keyCode===37){event.preventDefault();key.left=true}
+	//if(event.keyCode===38){event.preventDefault();key.up=true}
+	//if(event.keyCode===39){event.preventDefault();key.right=true}
+	//if(event.keyCode===40){event.preventDefault();key.down=true}
+	if(event.keyCode===32){event.preventDefault();key.space=true}
+	if(event.keyCode===16){event.preventDefault();key.shift=true}
+	if(event.keyCode===65){event.preventDefault();key.a=true}
+	if(event.keyCode===83){event.preventDefault();key.s=true}
+	if(event.keyCode===68){event.preventDefault();key.d=true}
+	if(event.keyCode===87){event.preventDefault();key.w=true}
+	if(event.keyCode===90){event.preventDefault();key.z=true}
+	if(event.keyCode===67){event.preventDefault();key.c=true}
+	if(event.keyCode===69){event.preventDefault();key.e=true}
+	if(event.keyCode===81){event.preventDefault();key.q=true}
+	if(event.keyCode===88){event.preventDefault();key.x=true}
+	if(event.keyCode===50){event.preventDefault();key.n2=true}
+}
+function kup(e){
+	var event=window.event ? window.event : e;
+	if(event.keyCode===37){key.left=false}
+	if(event.keyCode===38){key.up=false}
+	if(event.keyCode===39){key.right=false}
+	if(event.keyCode===40){key.down=false}
+	if(event.keyCode===32){key.space=false}
+	if(event.keyCode===16){key.shift=false}
+	if(event.keyCode===65){key.a=false}
+	if(event.keyCode===83){key.s=false}
+	if(event.keyCode===68){key.d=false}
+	if(event.keyCode===87){key.w=false}
+	if(event.keyCode===90){key.z=false}
+	if(event.keyCode===67){key.c=false}
+	if(event.keyCode===69){key.e=false}
+	if(event.keyCode===81){key.q=false}
+	if(event.keyCode===88){key.x=false}
+	if(event.keyCode===50){key.n2=false}
+}
+function init(){
+	document.addEventListener("keydown",kdown);
+	document.addEventListener("keyup",kup);
+	updateInputs();
+	draw();
+	play();
+}
+function play(){
+	cancelAnimationFrame(framecount);
+	animate=true;
+	frame();
+}
+function pause(){
+	animate=false;
+}
+var r1,g1,b1,r2,g2,b2;
+var particles=[];
+
+
+function vecAdd(u,v){
+return [u[0]+v[0],u[1]+v[1],u[2]+v[2]]
+}
+function vecScale(k,u){
+return [k*u[0],k*u[1],k*u[2]];
+}
+function dotProduct(u,v){
+return [u[0]*v[0]+u[1]*v[1]+u[2]*v[2]]
+}
+function crossProduct(u,v){
+return [u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
+}
+function gradient(x){
+return "rgb("+Math.ceil(r2+x*(r1-r2))+","+Math.ceil(g2+x*(g1-g2))+","+Math.ceil(b2+x*(b1-b2))+")";
+}
+const gpu = new GPU();
+
+function inMenger(x,y,z,o,s){
+	var ord=o;
+	var size=s;
+	if(x>0 && x<size && y>0 && y<size && z>0 && z<size){
+		while(ord>0){
+			ord--;
+			if((((Math.floor(3*x/size)===1) || (Math.floor(3*y/size)===1))&&(Math.floor(3*z/size)===1))
+			  ||((Math.floor(3*x/size)===1) && (Math.floor(3*y/size)===1))){
+				return 0;
+			}
+			size/=3;
+			x=x%(size);
+			y=y%(size);
+			z=z%(size);
+		}
+		return 1;
+	}else{
+		return 0;
+	}
+}
+gpu.addFunction(inMenger);
+
+function norm(vx,vy,vz){
+	return Math.sqrt(vx*vx + vy*vy + vz*vz);
+}
+gpu.addFunction(norm);
+
+function round(n){
+	return Math.floor(n+0.5);
+}
+gpu.addFunction(round);
+
+const trace = gpu.createKernel(function(x0,y0,z0, xvel,yvel,zvel, order,size) {
+	var gridres=size/(order*9);
+	var i=0;
+	var r=0;
+	var g=0;
+	var b=0;
+	var vx=xvel[this.thread.x][this.thread.y];
+	var vy=yvel[this.thread.x][this.thread.y];
+	var vz=zvel[this.thread.x][this.thread.y];
+	var spd=norm(vx,vy,vz);
+	
+	vx/=spd;
+	vy/=spd;
+	vz/=spd;
+	
+	var tinystep=gridres/1000;
+	
+
+		var rx=x0;
+		var ry=y0;
+		var rz=z0;
+		
+		
+		var f=(Math.floor(rx/gridres + 0.5))*gridres;
+		ry+=(f-rx)*vy/vx;
+		rz+=(f-rx)*vz/vx;
+		rx=f;
+		
+		while(r <= 200){
+				rx+=gridres*Math.sign(vx);
+				ry+=gridres*vy/Math.abs(vx);
+				rz+=gridres*vz/Math.abs(vx);
+				if(inMenger(rx+vx*tinystep,ry+vy*tinystep,rz+vz*tinystep,order,size) === 1){
+					break;
+				}
+				r+=gridres;
+			}
+			r=norm(rx-x0,ry-y0,rz-z0);
+			
+			rx=x0;
+			ry=y0;
+			rz=z0;
+			f=(Math.floor(ry/gridres + 0.5))*gridres;
+			rx+=(f-ry)*vx/vy;
+			rz+=(f-ry)*vz/vy;
+			ry=f;
+		
+		while(g < 200){
+				ry+=gridres*Math.sign(vy);
+				rx+=gridres*vx/Math.abs(vy);
+				rz+=gridres*vz/Math.abs(vy);
+				if(inMenger(rx+vx*tinystep,ry+vy*tinystep,rz+vz*tinystep,order,size) === 1){
+					break;
+				}
+				g+=gridres;
+			}
+			g=norm(rx-x0,ry-y0,rz-z0);
+			
+			rx=x0;
+			ry=y0;
+			rz=z0;
+			
+			f=(Math.floor(rz/gridres + 0.5))*gridres;
+			rx+=(f-rz)*vx/vz;
+			ry+=(f-rz)*vy/vz
+			rz=f;
+		while(b < 200){
+				rz+=gridres*Math.sign(vz);
+				rx+=gridres*vx/Math.abs(vz);
+				ry+=gridres*vy/Math.abs(vz);
+				if(inMenger(rx+vx*tinystep,ry+vy*tinystep,rz+vz*tinystep,order,size) === 1){
+					break;
+				}
+
+				b+=gridres;
+			}
+			b=norm(rx-x0,ry-y0,rz-z0);
+		
+	if((r>200 && g>200 && b>200) || i===1){
+		this.color(0,0,0);
+	}else if(r<g && r<b){
+		this.color(1,0,0);
+	}else if(g<r && g<b){
+		this.color(0,1,0);
+	}else{
+		this.color(0,0,1);	
+	}
+	
+	
+})
+  .setOutput([600, 600])
+  .setOutputToTexture(false)
+  .setGraphical(true)
+  .setLoopMaxIterations(Math.ceil(100000));
+
+const can = trace._canvas;
+document.getElementById('canholder').appendChild(can);
+
+function updateInputs(){
+	dt=Math.max(parseFloat(document.getElementById("input1").value),0.0001);
+	movedistance=parseFloat(document.getElementById("input2").value);
+	fractalorder=parseFloat(document.getElementById("input3").value);
+}
+function draw(){
+	var time=new Date().getTime();
+	eye.getVectors();
+	var xVelArray=[];
+	var yVelArray=[];
+	var zVelArray=[];
+	for(var i=0;i<canW;i++){
+		xVelArray[i]=[];
+		yVelArray[i]=[];
+		zVelArray[i]=[];
+		for(var j=0;j<canH;j++){
+			var vec1=vecAdd(vecAdd( vecScale((i/300 - 1),eye.hvec), vecScale((j/300-1),eye.vvec)), eye.vector);
+			xVelArray[i].push(vec1[0]);
+			yVelArray[i].push(vec1[1]);
+			zVelArray[i].push(vec1[2]);
+		}
+	}
+	trace(eye.x,eye.y,eye.z,xVelArray,yVelArray,zVelArray,fractalorder,40);
+	
+	//console.log((new Date().getTime() - time) +" ms");
+}
+var framecount=0;
+
+function frame(){
+	if(animate){
+		eye.move();
+		if(framecount%1===0){
+			draw();
+		}
+	}
+
+	framecount=requestAnimationFrame(frame);
+}
+</script>
+</body>
+</html>
