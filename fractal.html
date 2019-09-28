@@ -48,9 +48,9 @@ display:inline-block;
 <div id="canholder">
 </div>
 <button onclick="play()">Play</button><button onclick="pause()">Pause</button><br>
-Vector Step Size <input visible="false" type="text" size="10" id="input1" value="0.5"><br>
-Move Speed <input type="text" size="10" id="input2" value="1"><br>
-Fractal Order <input type="text" size="10" id="input3" value="2"><br>
+Fractal Order <input visible="false" type="text" size="4" id="input1" value="3"><br>
+Move Speed <input type="text" size="8" id="input2" value="1"><br>
+Shadow Detail <input type="text" size="8" id="input3" value="8"><br>
 <button onclick="updateInputs()">Update</button>
 <table hidden="true">
 <tr>
@@ -75,14 +75,14 @@ var canH=600;
 var key={up:false,down:false,left:false,right:false,space:false,shift:false,a:false,s:false,w:false,z:false,x:false,n2:false};
 var fps=30;
 var pixelsize;
-var light=[100,100,20];
+var light=[40,100,20];
 var fractalorder;
 var widen=true;
-var movedistance, dt;
+var movedistance, shadowdetail;
 
 var animate;
 
-var eye={x:10,y:20,z:-100,speed:0,strafespeed:0,
+var eye={x:20,y:20,z:-30,speed:0,strafespeed:0,
 xang:0,yang:0,zang:0,
 xangvel:0,yangvel:0,zangvel:0,vector:[],hvec:[],vvec:[],
 move(){
@@ -120,13 +120,12 @@ move(){
 		if(key.right){
 			light[0]++;
 		}
-		eye.x+=eye.speed*Math.sin(eye.yang)*Math.cos(eye.xang) + eye.strafespeed*Math.cos(eye.yang)*Math.cos(eye.xang);
+		eye.x+=eye.speed*Math.sin(eye.yang)*Math.cos(eye.xang) + eye.strafespeed*Math.cos(eye.yang);
 		eye.y+=eye.speed*Math.sin(eye.xang);
-		eye.z+=eye.speed*Math.cos(eye.yang)*Math.cos(eye.xang) - eye.strafespeed*Math.sin(eye.yang)*Math.cos(eye.xang);
+		eye.z+=eye.speed*Math.cos(eye.yang)*Math.cos(eye.xang) - eye.strafespeed*Math.sin(eye.yang);
 },
 	getVectors(){
 		this.vector= [Math.sin(this.yang)*Math.cos(this.xang),Math.sin(this.xang), Math.cos(this.yang)*Math.cos(this.xang)];
-		//this.hvec=crossProduct([0,1,0],this.vector);
 		this.hvec=[Math.cos(this.yang),0,-Math.sin(this.yang)];
 		this.vvec=crossProduct(this.vector,this.hvec);
 	}
@@ -245,7 +244,7 @@ function round(n){
 }
 gpu.addFunction(round);
 
-const trace = gpu.createKernel(function(x0,y0,z0, xvel,yvel,zvel, order,size, lx,ly,lz) {
+const trace = gpu.createKernel(function(x0,y0,z0, xvel,yvel,zvel, order,size, lx,ly,lz, shd) {
 	var gridres=size/(order*9);
 	var hitplane=0;
 	var r=0;
@@ -355,9 +354,9 @@ const trace = gpu.createKernel(function(x0,y0,z0, xvel,yvel,zvel, order,size, lx
 
 			
 			while(rx>0 && rx<size && ry>0 && ry<size && rz>0 && rz<size){
-				rx+=vx*gridres/40;
-				ry+=vy*gridres/40;
-				rz+=vz*gridres/40;
+				rx+=vx*gridres/shd;
+				ry+=vy*gridres/shd;
+				rz+=vz*gridres/shd;
 				if(inMenger(rx+vx*tinystep,ry+vy*tinystep,rz+vz*tinystep,order,size) === 1){
 					hitplane+=3;
 					break;
@@ -392,9 +391,9 @@ const can = trace._canvas;
 document.getElementById('canholder').appendChild(can);
 
 function updateInputs(){
-	dt=Math.max(parseFloat(document.getElementById("input1").value),0.0001);
+	fractalorder=parseFloat(document.getElementById("input1").value);
 	movedistance=parseFloat(document.getElementById("input2").value);
-	fractalorder=parseFloat(document.getElementById("input3").value);
+	shadowdetail=parseFloat(document.getElementById("input3").value);
 }
 function draw(){
 	var time=new Date().getTime();
@@ -413,7 +412,7 @@ function draw(){
 			zVelArray[i].push(vec1[2]);
 		}
 	}
-	trace(eye.x,eye.y,eye.z,xVelArray,yVelArray,zVelArray,fractalorder,40,light[0],light[1],light[2]);
+	trace(eye.x,eye.y,eye.z,xVelArray,yVelArray,zVelArray,fractalorder,40,light[0],light[1],light[2],shadowdetail);
 	
 	//console.log((new Date().getTime() - time) +" ms");
 }
