@@ -1,4 +1,3 @@
-
 <!doctype HTML>
 <html>
 <head>
@@ -51,7 +50,7 @@ display:inline-block;
 <button onclick="play()">Play</button><button onclick="pause()">Pause</button><br>
 Vector Step Size <input visible="false" type="text" size="10" id="input1" value="0.5"><br>
 Move Speed <input type="text" size="10" id="input2" value="1"><br>
-Fractal Order <input type="text" size="10" id="input3" value="3"><br>
+Fractal Order <input type="text" size="10" id="input3" value="2"><br>
 <button onclick="updateInputs()">Update</button>
 <table hidden="true">
 <tr>
@@ -76,7 +75,7 @@ var canH=600;
 var key={up:false,down:false,left:false,right:false,space:false,shift:false,a:false,s:false,w:false,z:false,x:false,n2:false};
 var fps=30;
 var pixelsize;
-var renderdist=400;
+var light=[100,100,20];
 var fractalorder;
 var widen=true;
 var movedistance, dt;
@@ -115,6 +114,12 @@ move(){
 		if(key.n2 && eye.xang+Math.PI/120<Math.PI/2){
 			eye.xang+=Math.PI/120;
 		}
+		if(key.left){
+			light[0]--;
+		}
+		if(key.right){
+			light[0]++;
+		}
 		eye.x+=eye.speed*Math.sin(eye.yang)*Math.cos(eye.xang) + eye.strafespeed*Math.cos(eye.yang)*Math.cos(eye.xang);
 		eye.y+=eye.speed*Math.sin(eye.xang);
 		eye.z+=eye.speed*Math.cos(eye.yang)*Math.cos(eye.xang) - eye.strafespeed*Math.sin(eye.yang)*Math.cos(eye.xang);
@@ -136,10 +141,10 @@ var offset;
 
 function kdown(e){
 	var event=window.event ? window.event : e;
-	//if(event.keyCode===37){event.preventDefault();key.left=true}
-	//if(event.keyCode===38){event.preventDefault();key.up=true}
-	//if(event.keyCode===39){event.preventDefault();key.right=true}
-	//if(event.keyCode===40){event.preventDefault();key.down=true}
+	if(event.keyCode===37){key.left=true}
+	if(event.keyCode===38){event.preventDefault();key.up=true}
+	if(event.keyCode===39){key.right=true}
+	if(event.keyCode===40){event.preventDefault();key.down=true}
 	if(event.keyCode===32){event.preventDefault();key.space=true}
 	if(event.keyCode===16){event.preventDefault();key.shift=true}
 	if(event.keyCode===65){event.preventDefault();key.a=true}
@@ -151,7 +156,7 @@ function kdown(e){
 	if(event.keyCode===69){event.preventDefault();key.e=true}
 	if(event.keyCode===81){event.preventDefault();key.q=true}
 	if(event.keyCode===88){event.preventDefault();key.x=true}
-	if(event.keyCode===50){event.preventDefault();key.n2=true}
+	if(event.keyCode===50){key.n2=true}
 }
 function kup(e){
 	var event=window.event ? window.event : e;
@@ -240,12 +245,13 @@ function round(n){
 }
 gpu.addFunction(round);
 
-const trace = gpu.createKernel(function(x0,y0,z0, xvel,yvel,zvel, order,size) {
+const trace = gpu.createKernel(function(x0,y0,z0, xvel,yvel,zvel, order,size, lx,ly,lz) {
 	var gridres=size/(order*9);
-	var i=0;
+	var hitplane=0;
 	var r=0;
 	var g=0;
 	var b=0;
+	
 	var vx=xvel[this.thread.x][this.thread.y];
 	var vy=yvel[this.thread.x][this.thread.y];
 	var vz=zvel[this.thread.x][this.thread.y];
@@ -318,17 +324,64 @@ const trace = gpu.createKernel(function(x0,y0,z0, xvel,yvel,zvel, order,size) {
 			}
 			b=norm(rx-x0,ry-y0,rz-z0);
 		
-	if((r>200 && g>200 && b>200) || i===1){
-		this.color(0,0,0);
-	}else if(r<g && r<b){
-		this.color(1,0,0);
+	if(r<g && r<b){
+		hitplane=1;
+		rx=x0+r*vx;
+		ry=y0+r*vy;
+		rz=z0+r*vz;
 	}else if(g<r && g<b){
-		this.color(0,1,0);
+		hitplane=2;
+		rx=x0+g*vx;
+		ry=y0+g*vy;
+		rz=z0+g*vz;
 	}else{
-		this.color(0,0,1);	
+		hitplane=3;
+		rx=x0+b*vx;
+		ry=y0+b*vy;
+		rz=z0+b*vz;
+	}
+	if(rx<-1 || rx>size+1 || ry<-1 || ry>size+1 || rz<-1 || rz>size+1){
+		hitplane=0;
 	}
 	
-	
+	if(hitplane !== 0){
+		if((hitplane === 1 && Math.sign(vx)===Math.sign(rx-lx))
+		 ||(hitplane === 2 && Math.sign(vy)===Math.sign(ry-ly))
+		 ||(hitplane === 3 && Math.sign(vz)===Math.sign(rz-lz))){
+			var refnorm=norm(lx-rx,ly-ry,lz-rz);
+			vx=(lx-rx)/refnorm;
+			vy=(ly-ry)/refnorm;
+			vz=(lz-rz)/refnorm;
+
+			
+			while(rx>0 && rx<size && ry>0 && ry<size && rz>0 && rz<size){
+				rx+=vx*gridres/40;
+				ry+=vy*gridres/40;
+				rz+=vz*gridres/40;
+				if(inMenger(rx+vx*tinystep,ry+vy*tinystep,rz+vz*tinystep,order,size) === 1){
+					hitplane+=3;
+					break;
+				}
+			}
+		}else{
+			hitplane+=3;
+		}
+		if(hitplane == 1){
+			this.color(1,0,0);
+		}else if(hitplane == 2){
+			this.color(1,1,0);
+		}else if(hitplane == 3){
+			this.color(1,.5,0);
+		}else if(hitplane == 4){
+			this.color(.5,0,0);
+		}else if(hitplane == 5){
+			this.color(.5,.5,0);
+		}else if(hitplane == 6){
+			this.color(.5,.2,0);
+		}
+	}else{
+		this.color(0,0,0);
+	}
 })
   .setOutput([600, 600])
   .setOutputToTexture(false)
@@ -360,7 +413,7 @@ function draw(){
 			zVelArray[i].push(vec1[2]);
 		}
 	}
-	trace(eye.x,eye.y,eye.z,xVelArray,yVelArray,zVelArray,fractalorder,40);
+	trace(eye.x,eye.y,eye.z,xVelArray,yVelArray,zVelArray,fractalorder,40,light[0],light[1],light[2]);
 	
 	//console.log((new Date().getTime() - time) +" ms");
 }
