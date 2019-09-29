@@ -253,7 +253,8 @@ function round(n){
 }
 gpu.addFunction(round);
 
-const trace = gpu.createKernel(function(x0,y0,z0, xvel,yvel,zvel, order,size, lx,ly,lz, shd) {
+const trace = gpu.createKernel(function(x0,y0,z0, xvel,yvel,zvel, order,size, 
+lx,ly,lz, shd, cx,cy,cz) {
 	var gridres=size/(Math.pow(3,order));
 	var hitplane=0;
 	var r=0;
@@ -374,18 +375,19 @@ const trace = gpu.createKernel(function(x0,y0,z0, xvel,yvel,zvel, order,size, lx
 		}else{
 			hitplane+=3;
 		}
+		var dark=0.4;
 		if(hitplane == 1){
-			this.color(1,0,0);
+			this.color(cx[0],cx[1],cx[2]);
 		}else if(hitplane == 2){
-			this.color(1,1,0);
+			this.color(cy[0],cy[1],cy[2]);
 		}else if(hitplane == 3){
-			this.color(1,.5,0);
+			this.color(cz[0],cz[1],cz[2]);
 		}else if(hitplane == 4){
-			this.color(.2,0,0);
+			this.color(cx[0]*dark,cx[1]*dark,cx[2]*dark);
 		}else if(hitplane == 5){
-			this.color(.2,.2,0);
+			this.color(cy[0]*dark,cy[1]*dark,cy[2]*dark);
 		}else if(hitplane == 6){
-			this.color(.2,.1,0);
+			this.color(cz[0]*dark,cz[1]*dark,cz[2]*dark);
 		}
 	}else{
 		this.color(0,0,0);
@@ -394,7 +396,7 @@ const trace = gpu.createKernel(function(x0,y0,z0, xvel,yvel,zvel, order,size, lx
   .setOutput([600, 600])
   .setOutputToTexture(false)
   .setGraphical(true)
-  .setLoopMaxIterations(Math.ceil(100000));
+  .setLoopMaxIterations(65536);
 
 const can = trace._canvas;
 document.getElementById('canholder').appendChild(can);
@@ -421,12 +423,15 @@ function draw(){
 			zVelArray[i].push(vec1[2]);
 		}
 	}
-	trace(eye.x,eye.y,eye.z,xVelArray,yVelArray,zVelArray,fractalorder,40,light[0],light[1],light[2],shadowdetail);
+	trace(eye.x,eye.y,eye.z,xVelArray,yVelArray,zVelArray,fractalorder,40,
+	light[0],light[1],light[2],shadowdetail,cx,cy,cz);
 	
 	//console.log((new Date().getTime() - time) +" ms");
 }
 var framecount=0;
-
+var cx=[1,.0,0];
+var cy=[1,1,0];
+var cz=[1,.5,0];
 function frame(){
 	if(animate){
 		eye.move();
