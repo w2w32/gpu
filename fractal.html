@@ -75,7 +75,7 @@ var canH=600;
 var key={up:false,down:false,left:false,right:false,space:false,shift:false,a:false,s:false,w:false,z:false,x:false,n2:false};
 var fps=30;
 var pixelsize;
-var light=[40,100,20];
+var light=[20,20,20];
 var fractalorder;
 var widen=true;
 var movedistance, shadowdetail;
@@ -353,7 +353,7 @@ const trace = gpu.createKernel(function(x0,y0,z0, xvel,yvel,zvel, order,size, lx
 			vz=(lz-rz)/refnorm;
 
 			
-			while(rx>0 && rx<size && ry>0 && ry<size && rz>0 && rz<size){
+			while(rx>0 && rx<size && ry>0 && ry<size && rz>0 && rz<size && norm(rx-lx,ry-ly,rz-lz)>gridres*2){
 				rx+=vx*gridres/shd;
 				ry+=vy*gridres/shd;
 				rz+=vz*gridres/shd;
@@ -372,11 +372,11 @@ const trace = gpu.createKernel(function(x0,y0,z0, xvel,yvel,zvel, order,size, lx
 		}else if(hitplane == 3){
 			this.color(1,.5,0);
 		}else if(hitplane == 4){
-			this.color(.5,0,0);
+			this.color(.2,0,0);
 		}else if(hitplane == 5){
-			this.color(.5,.5,0);
+			this.color(.2,.2,0);
 		}else if(hitplane == 6){
-			this.color(.5,.2,0);
+			this.color(.2,.1,0);
 		}
 	}else{
 		this.color(0,0,0);
