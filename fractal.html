@@ -1,3 +1,4 @@
+
 <!doctype HTML>
 <html>
 <head>
@@ -49,7 +50,7 @@ display:inline-block;
 </div>
 <button onclick="play()">Play</button><button onclick="pause()">Pause</button><br>
 Fractal Order <input visible="false" type="text" size="4" id="input1" value="3"><br>
-Move Speed <input type="text" size="8" id="input2" value="1"><br>
+Camera Move Speed <input type="text" size="8" id="input2" value="1"><br>
 Shadow Quality <input type="text" size="8" id="input3" value="8"><br>
 <button onclick="updateInputs()">Update</button>
 <table hidden="true">
@@ -162,6 +163,9 @@ function kdown(e){
 	if(event.keyCode===81){event.preventDefault();key.q=true}
 	if(event.keyCode===88){event.preventDefault();key.x=true}
 	if(event.keyCode===50){key.n2=true}
+	
+	animate=true;
+
 }
 function kup(e){
 	var event=window.event ? window.event : e;
@@ -181,6 +185,13 @@ function kup(e){
 	if(event.keyCode===81){key.q=false}
 	if(event.keyCode===88){key.x=false}
 	if(event.keyCode===50){key.n2=false}
+	
+	animate=false;
+	for(i in key){
+		if(key[i]===true){
+			animate=true;
+		}
+	}
 }
 function init(){
 	document.addEventListener("keydown",kdown);
@@ -218,12 +229,15 @@ return "rgb("+Math.ceil(r2+x*(r1-r2))+","+Math.ceil(g2+x*(g1-g2))+","+Math.ceil(
 }
 const gpu = new GPU();
 
-function inFractal(x,y,z,o,s){
+function inFractal(x0,y0,z0,o,s){
 	var ord=o;
 	var size=s;
-	var frx=1;
-	var fry=1;
+	var frx=2;
+	var fry=2;
 	var frz=1;
+	var x=x0;
+	var y=y0;
+	var z=z0;
 	if(x>0 && x<size && y>0 && y<size && z>0 && z<size){
 		while(ord>0){
 			ord--;
@@ -265,73 +279,92 @@ lx,ly,lz, shd, cx,cy,cz) {
 	var vy=yvel[this.thread.x][this.thread.y];
 	var vz=zvel[this.thread.x][this.thread.y];
 	var spd=norm(vx,vy,vz);
-	
 	vx/=spd;
 	vy/=spd;
 	vz/=spd;
 	
 	var tinystep=gridres/20;
 	
-
-		var rx=x0;
-		var ry=y0;
-		var rz=z0;
+	var rx=x0;
+	var ry=y0;
+	var rz=z0;
+	
+	//set to black if it doesn't hit cube
+	var t0x = (-rx) / vx; 
+	var t1x = (size - rx) / vx;
+	var t0y = (-ry) / vy;
+	var t1y = (size - ry) / vy;
+	var t0z = (-rz) / vz;
+	var t1z = (size - rz) / vz;
+	
+	var txmin=Math.min(t0x,t1x);
+	var tymin=Math.min(t0y,t1y);
+	var tzmin=Math.min(t0z,t1z);
+	var txmax=Math.max(t0x,t1x);
+	var tymax=Math.max(t0y,t1y);
+	var tzmax=Math.max(t0z,t1z);
+	
+	if(txmin>tymax || tymin>txmax
+	|| txmin>tzmax || txmin>txmax
+	|| tzmin>tymax || tymin>tzmax){
+		r=201;
+		g=201;
+		b=201;
+	}
+	
+	//align to grid and start checking each plane intersection
+	var f=(Math.floor(rx/gridres + 0.5))*gridres;
+	ry+=(f-rx)*vy/vx;
+	rz+=(f-rx)*vz/vx;
+	rx=f;
+	while(r <= 200){
+		rx+=gridres*Math.sign(vx);
+		ry+=gridres*vy/Math.abs(vx);
+		rz+=gridres*vz/Math.abs(vx);
+		if(inFractal(rx+vx*tinystep,ry,rz,order,size) === 1){
+			break;
+		}
+		r+=gridres;
+		}
+		r=norm(rx-x0,ry-y0,rz-z0);
 		
-		
-		var f=(Math.floor(rx/gridres + 0.5))*gridres;
-		ry+=(f-rx)*vy/vx;
-		rz+=(f-rx)*vz/vx;
-		rx=f;
-		
-		while(r <= 200){
-				rx+=gridres*Math.sign(vx);
-				ry+=gridres*vy/Math.abs(vx);
-				rz+=gridres*vz/Math.abs(vx);
-				if(inFractal(rx+vx*tinystep,ry,rz,order,size) === 1){
-					break;
-				}
-				r+=gridres;
+		rx=x0;
+		ry=y0;
+		rz=z0;
+		f=(Math.floor(ry/gridres + 0.5))*gridres;
+		rx+=(f-ry)*vx/vy;
+		rz+=(f-ry)*vz/vy;
+		ry=f;
+	
+	while(g < 200){
+			ry+=gridres*Math.sign(vy);
+			rx+=gridres*vx/Math.abs(vy);
+			rz+=gridres*vz/Math.abs(vy);
+			if(inFractal(rx,ry+vy*tinystep,rz,order,size) === 1){
+				break;
 			}
-			r=norm(rx-x0,ry-y0,rz-z0);
-			
-			rx=x0;
-			ry=y0;
-			rz=z0;
-			f=(Math.floor(ry/gridres + 0.5))*gridres;
-			rx+=(f-ry)*vx/vy;
-			rz+=(f-ry)*vz/vy;
-			ry=f;
+			g+=gridres;
+		}
+		g=norm(rx-x0,ry-y0,rz-z0);
 		
-		while(g < 200){
-				ry+=gridres*Math.sign(vy);
-				rx+=gridres*vx/Math.abs(vy);
-				rz+=gridres*vz/Math.abs(vy);
-				if(inFractal(rx,ry+vy*tinystep,rz,order,size) === 1){
-					break;
-				}
-				g+=gridres;
-			}
-			g=norm(rx-x0,ry-y0,rz-z0);
-			
-			rx=x0;
-			ry=y0;
-			rz=z0;
-			
-			f=(Math.floor(rz/gridres + 0.5))*gridres;
-			rx+=(f-rz)*vx/vz;
-			ry+=(f-rz)*vy/vz
-			rz=f;
-		while(b < 200){
-				rz+=gridres*Math.sign(vz);
-				rx+=gridres*vx/Math.abs(vz);
-				ry+=gridres*vy/Math.abs(vz);
-				if(inFractal(rx,ry,rz+vz*tinystep,order,size) === 1){
-					break;
-				}
-
-				b+=gridres;
-			}
-			b=norm(rx-x0,ry-y0,rz-z0);
+		rx=x0;
+		ry=y0;
+		rz=z0;
+	
+		f=(Math.floor(rz/gridres + 0.5))*gridres;
+		rx+=(f-rz)*vx/vz;
+		ry+=(f-rz)*vy/vz
+		rz=f;
+	while(b < 200){
+		rz+=gridres*Math.sign(vz);
+		rx+=gridres*vx/Math.abs(vz);
+		ry+=gridres*vy/Math.abs(vz);
+		if(inFractal(rx,ry,rz+vz*tinystep,order,size) === 1){
+			break;
+		}
+			b+=gridres;
+		}
+		b=norm(rx-x0,ry-y0,rz-z0);
 		
 	if(r<g && r<b){
 		hitplane=1;
@@ -439,7 +472,6 @@ function frame(){
 			draw();
 		}
 	}
-
 	framecount=requestAnimationFrame(frame);
 }
 </script>
