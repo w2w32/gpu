@@ -1,3 +1,4 @@
+
 <!doctype HTML>
 <html>
 <head>
@@ -205,14 +206,12 @@ function init(){
 	updateInputs();
 	draw();
 	play();
+	animate=false;
 }
 function play(){
 	cancelAnimationFrame(framecount);
 	animate=true;
 	frame();
-}
-function pause(){
-	animate=false;
 }
 var r1,g1,b1,r2,g2,b2;
 var particles=[];
@@ -273,7 +272,7 @@ function round(n){
 }
 gpu.addFunction(round);
 
-const trace = gpu.createKernel(function(x0,y0,z0, xvel,yvel,zvel, order,size, 
+const trace = gpu.createKernel(function(x0,y0,z0, dir,hvec,vvec, order,size, 
 lx,ly,lz, shd, cx,cy,cz) {
 	var gridres=size/(Math.pow(3,order));
 	var hitplane=0;
@@ -281,9 +280,9 @@ lx,ly,lz, shd, cx,cy,cz) {
 	var g=0;
 	var b=0;
 	
-	var vx=xvel[this.thread.x][this.thread.y];
-	var vy=yvel[this.thread.x][this.thread.y];
-	var vz=zvel[this.thread.x][this.thread.y];
+	var vx=((this.thread.x/300 - 1)*hvec[0] + (this.thread.y/300 - 1)*vvec[0] + dir[0]);
+	var vy=((this.thread.x/300 - 1)*hvec[1] + (this.thread.y/300 - 1)*vvec[1] + dir[1]);
+	var vz=((this.thread.x/300 - 1)*hvec[2] + (this.thread.y/300 - 1)*vvec[2] + dir[2]);
 	var spd=norm(vx,vy,vz);
 	vx/=spd;
 	vy/=spd;
@@ -461,26 +460,10 @@ function updateInputs(){
 	draw();
 }
 function draw(){
-	var time=new Date().getTime();
 	eye.getVectors();
-	var xVelArray=[];
-	var yVelArray=[];
-	var zVelArray=[];
-	for(var i=0;i<canW;i++){
-		xVelArray[i]=[];
-		yVelArray[i]=[];
-		zVelArray[i]=[];
-		for(var j=0;j<canH;j++){
-			var vec1=vecAdd(vecAdd( vecScale((i/300 - 1),eye.hvec), vecScale((j/300-1),eye.vvec)), eye.vector);
-			xVelArray[i].push(vec1[0]);
-			yVelArray[i].push(vec1[1]);
-			zVelArray[i].push(vec1[2]);
-		}
-	}
-	trace(eye.x,eye.y,eye.z,xVelArray,yVelArray,zVelArray,fractalorder,40,
+
+	trace(eye.x,eye.y,eye.z,eye.vector,eye.hvec,eye.vvec,fractalorder,40,
 	light[0],light[1],light[2],shadowdetail,cx,cy,cz);
-	
-	//console.log((new Date().getTime() - time) +" ms");
 }
 var framecount=0;
 var cx=[1,.0,0];
