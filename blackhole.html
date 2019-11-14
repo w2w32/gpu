@@ -50,6 +50,7 @@ display:inline-block;
 Vector Step Size <input visible="false" type="text" size="10" id="input1" value="0.5"><br>
 Camera Move Speed <input type="text" size="10" id="input2" value="1"><br>
 Gravity <input type="text" size="10" id="input3" value="1.0"><br>
+Event Horizon Radius <input type="text" size="10" id="input4" value="1.0"><br>
 <button onclick="updateInputs()">Update</button>
 <table hidden="true">
 <tr>
@@ -72,7 +73,7 @@ Gravity <input type="text" size="10" id="input3" value="1.0"><br>
 var canW=600;
 var canH=600;
 var key={up:false,down:false,left:false,right:false,space:false,shift:false,a:false,s:false,w:false,z:false,x:false,n2:false};
-var fps=30;
+var ehr=1;
 var pixelsize;
 var renderdist=400;
 var widen=true;
@@ -211,7 +212,7 @@ return "rgb("+Math.ceil(r2+x*(r1-r2))+","+Math.ceil(g2+x*(g1-g2))+","+Math.ceil(
 }
 var gravity;
 const gpu = new GPU();
-const trace = gpu.createKernel(function(x0,y0,z0,xvel,yvel,zvel,gravity,dt) {
+const trace = gpu.createKernel(function(x0,y0,z0,xvel,yvel,zvel,gravity,dt,ehr) {
 	var rx=x0;
 	var ry=y0;
 	var rz=z0;
@@ -270,7 +271,7 @@ const trace = gpu.createKernel(function(x0,y0,z0,xvel,yvel,zvel,gravity,dt) {
 		vz+=(kzvel1+2*kzvel2+2*kzvel3+kzvel4)/6;
 		
 		
-		if(rx*rx+ry*ry+rz*rz < dt*(vx*vx+vy*vy+vz*vz)){
+		if(rx*rx+ry*ry+rz*rz < ehr){
 			r=0;
 			g=0;
 			b=0;
@@ -338,6 +339,7 @@ function updateInputs(){
 	dt=Math.max(parseFloat(document.getElementById("input1").value),0.0001);
 	movedistance=parseFloat(document.getElementById("input2").value);
 	gravity=parseFloat(document.getElementById("input3").value);
+	ehr=parseFloat(document.getElementById("input4").value);
 }
 function draw(){
 	var time=new Date().getTime();
@@ -356,7 +358,7 @@ function draw(){
 			zVelArray[i].push(vec1[2]);
 		}
 	}
-	trace(eye.x,eye.y,eye.z,xVelArray,yVelArray,zVelArray,gravity,dt);
+	trace(eye.x,eye.y,eye.z,xVelArray,yVelArray,zVelArray,gravity,dt,ehr);
 	
 	//console.log((new Date().getTime() - time) +" ms");
 }
