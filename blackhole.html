@@ -1,4 +1,3 @@
-
 <!doctype HTML>
 <html>
 <head>
@@ -48,7 +47,6 @@ display:inline-block;
 <body bgcolor="#222222" onload="init()">
 <div id="canholder">
 </div>
-<button onclick="play()">Play</button><button onclick="pause()">Pause</button><br>
 Vector Step Size <input visible="false" type="text" size="10" id="input1" value="0.5"><br>
 Camera Move Speed <input type="text" size="10" id="input2" value="1"><br>
 Gravity <input type="text" size="10" id="input3" value="1.0"><br>
@@ -151,6 +149,7 @@ function kdown(e){
 	if(event.keyCode===81){event.preventDefault();key.q=true}
 	if(event.keyCode===88){event.preventDefault();key.x=true}
 	if(event.keyCode===50){event.preventDefault();key.n2=true}
+	animate=true;
 }
 function kup(e){
 	var event=window.event ? window.event : e;
@@ -170,6 +169,13 @@ function kup(e){
 	if(event.keyCode===81){key.q=false}
 	if(event.keyCode===88){key.x=false}
 	if(event.keyCode===50){key.n2=false}
+	
+	animate=false;
+	for(i in key){
+		if(key[i]===true){
+			animate=true;
+		}
+	}
 }
 function init(){
 	document.addEventListener("keydown",kdown);
@@ -177,14 +183,12 @@ function init(){
 	updateInputs();
 	draw();
 	play();
+	animate=false;
 }
 function play(){
 	cancelAnimationFrame(framecount);
 	animate=true;
 	frame();
-}
-function pause(){
-	animate=false;
 }
 var r1,g1,b1,r2,g2,b2;
 var particles=[];
