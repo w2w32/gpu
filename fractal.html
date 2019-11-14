@@ -267,11 +267,6 @@ function norm(vx,vy,vz){
 }
 gpu.addFunction(norm);
 
-function round(n){
-	return Math.floor(n+0.5);
-}
-gpu.addFunction(round);
-
 const trace = gpu.createKernel(function(x0,y0,z0, dir,hvec,vvec, order,size, 
 lx,ly,lz, shd, cx,cy,cz) {
 	var gridres=size/(Math.pow(3,order));
@@ -318,7 +313,12 @@ lx,ly,lz, shd, cx,cy,cz) {
 	}
 	
 	//align to grid and start checking each plane intersection
-	var f=(Math.floor(rx/gridres + 0.5))*gridres;
+	var f;
+	if(vx>0){
+	f=(Math.floor(rx/gridres))*gridres;
+	}else{
+	f=(Math.ceil(rx/gridres))*gridres;
+	}
 	ry+=(f-rx)*vy/vx;
 	rz+=(f-rx)*vz/vx;
 	rx=f;
@@ -336,7 +336,11 @@ lx,ly,lz, shd, cx,cy,cz) {
 		rx=x0;
 		ry=y0;
 		rz=z0;
-		f=(Math.floor(ry/gridres + 0.5))*gridres;
+		if(vy>0){
+		f=(Math.floor(ry/gridres))*gridres;
+		}else{
+		f=(Math.ceil(ry/gridres))*gridres;
+		}
 		rx+=(f-ry)*vx/vy;
 		rz+=(f-ry)*vz/vy;
 		ry=f;
@@ -356,7 +360,11 @@ lx,ly,lz, shd, cx,cy,cz) {
 		ry=y0;
 		rz=z0;
 	
-		f=(Math.floor(rz/gridres + 0.5))*gridres;
+		if(vz>0){
+		f=(Math.floor(rz/gridres))*gridres;
+		}else{
+		f=(Math.ceil(rz/gridres))*gridres;
+		}
 		rx+=(f-rz)*vx/vz;
 		ry+=(f-rz)*vy/vz
 		rz=f;
