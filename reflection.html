@@ -18,11 +18,7 @@ var canW=600;
 var canH=600;
 var ctx;
 var key={up:false,down:false,left:false,right:false,space:false,shift:false,a:false,s:false,w:false,z:false};
-var maxbounce=3;
-var turnspeed=1/4;
-var renderdist=400;
-var widen=true;
-var movedistance=2;
+var maxbounce,movedistance;
 var light=[500,500,0];
 var shapes=[[0,270,40,0,20,255,255,255],
 	[0,40,120,50,40,120,40,120],
