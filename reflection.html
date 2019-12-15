@@ -2,6 +2,7 @@
 <html>
 <head>
 <title></title>
+
 </head>
 <body bgcolor="#222222" onload="init()">
 
@@ -9,29 +10,49 @@
 </div>
 <br>
 
-Bounces <input type="text" size="10" id="input1" value="6"><br>
+Bounces <input type="text" size="10" id="input1" value="8"><br>
 Camera Move Speed <input type="text" size="10" id="input2" value="2"><br>
 <input hidden="true" type="text" size="10" id="input3" value="0.0"><br>
+<table hidden="true">
+<tr>
+<td>Color 1 RGB</td>
+<td><input type="text" size="3" id="r1" value="202" onchange="updateColors()"></td>
+<td><input type="text" size="3" id="g1" value="10" onchange="updateColors()"></td>
+<td><input type="text" size="3" id="b1" value="50" onchange="updateColors()"></td>
+<td><span class="colorbox"></span></td>
+</tr>
+<tr>
+<td>Color 2 RGB</td>
+<td><input type="text" size="3" id="r2" value="120" onchange="updateColors()"></td>
+<td><input type="text" size="3" id="g2" value="10" onchange="updateColors()"></td>
+<td><input type="text" size="3" id="b2" value="210" onchange="updateColors()"></td>
+<td><span class="colorbox"></span></td>
+</tr>
+</table>
 <script type="text/javascript" src="https://cdn.rawgit.com/gpujs/gpu.js/45103b7f154a12ec639990c6896b21a053eb6a6c/bin/gpu.js"></script>
 <script type="text/javascript">
 var canW=600;
 var canH=600;
 var ctx;
 var key={up:false,down:false,left:false,right:false,space:false,shift:false,a:false,s:false,w:false,z:false};
-var maxbounce,movedistance;
-var light=[500,500,0];
+var maxbounce;
+var turnspeed=1/4;
+var renderdist=400;
+var widen=true;
+var movedistance=2;
+var light=[-500,500,0];
 var shapes=[[0,270,40,0,20,255,255,255],
 	[0,40,120,50,40,120,40,120],
-	[0,-180,50,180,140,0,150,255],
-	[1,0,0,0,0,1,0],
-	[0,3,0,200,100,230,220,0],
-	[6,0,0,0,100,20,120,120,120]];
+	[0,-1000,0,0,600,150,150,255],
+	[0,-180,50,180,140,150,255,150],
+	[1,0,0,0,0,1,0,0],
+	[3,0,200,100,230,220,0,0]];
 	/*[i][0]=type 
 		0=sphere [0,cx,cy,cz,rad,r,g,b]
 		1=plane [1,px,py,pz,nx,ny,nz,r,g,b] (n normalized)
 		
-		3=y-cyl [0,3,cx,cz,rad,r,g,b]
-		
+		3=y-cyl [3,cx,cz,rad,r,g,b]
+
 		*/
 var animate=false;
 
@@ -219,7 +240,7 @@ function yCylHit(px,py,pz, vx,vy,vz,  cx,cz,cr){
 	}
 gpu.addFunction(yCylHit);
 
-const trace = gpu.createKernel(function(x0,y0,z0,dir,hvec,vvec,li,shapes,shapecount,maxbounce) {
+const trace = gpu.createKernel(function(x0,y0,z0,dir,hvec,vvec,li,shapes,shapecount,maxbounce,start) {
 	var rx=x0;
 	var ry=y0;
 	var rz=z0;
@@ -230,7 +251,6 @@ const trace = gpu.createKernel(function(x0,y0,z0,dir,hvec,vvec,li,shapes,shapeco
 	var r=0;
 	var g=0;
 	var b=0;
-	
 
 	var norm=Math.sqrt(vx*vx + vy*vy + vz*vz);
 	
@@ -272,7 +292,7 @@ const trace = gpu.createKernel(function(x0,y0,z0,dir,hvec,vvec,li,shapes,shapeco
 		var lasthit=shapehit;
 		var dist=-1;
 		bounce++;
-		for(var i=0;i<shapecount;i++){//number of objects
+		for(var i=0;i<6;i++){//number of objects
 
 			if(i!==lasthit){
 				var t=-1;
@@ -379,9 +399,9 @@ const trace = gpu.createKernel(function(x0,y0,z0,dir,hvec,vvec,li,shapes,shapeco
 			var ldist=lightvisible(rx,ry,rz,li,shapes);
 			if(ldist>0){
 				ldist/=500;
-				r+=r/(ldist);   
-				g+=g/(ldist);
-				b+=b/(ldist);
+				r*=1+1/(ldist);   
+				g*=1+1/(ldist);
+				b*=1+1/(ldist);
 				}
 				/*
 				if(intensity>0){
@@ -415,23 +435,20 @@ const can = trace._canvas;
 document.getElementById('canholder').appendChild(can);
 
 function updateInputs(){
-	if(document.getElementById("input1").value<=40){
+	if(document.getElementById("input1").value<=99){
 		maxbounce=parseInt(document.getElementById("input1").value);
 	}
 	movedistance=parseFloat(document.getElementById("input2").value);
 	
 }
 function draw(){
-	var time=new Date().getTime();
 	updateInputs();
 	eye.getVectors();
 
 	trace(eye.x,eye.y,eye.z,eye.vector,eye.hvec,eye.vvec,
-	light,shapes,shapes.length,maxbounce);
-
-	//console.log((new Date().getTime() - time) +" ms");
+	light,shapes,shapes.length,maxbounce,start);
 }
-
+var start=1;
 var framecount=0;
 function frame(){
 	if(animate){
