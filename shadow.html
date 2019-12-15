@@ -1,0 +1,435 @@
+
+
+<!doctype HTML>
+<html>
+<head>
+<title></title>
+<style>
+body{
+color:white;
+}
+canvas{
+position:relative;
+}
+#can0{
+border:2px solid #333;
+}
+
+#display{
+z-index:2;
+position:relative;
+font-family: menlo, sans-serif;
+color:#0f0;
+left:400px;
+bottom:140px;
+}
+
+td{
+background-color: black;
+width:99px;
+padding:0px;
+border-radius:4px;
+text-align:center;
+}
+#display_x,#display_y,#display_z{
+height:75px;
+font-size:1.5em;
+}
+.check{
+vertical-align:top;
+
+}
+.colorbox{
+width:12px;
+height:12px;
+display:inline-block;
+}
+</style>
+</head>
+<body bgcolor="#222222" onload="init()">
+
+<div id="canholder">
+</div>
+<br>
+
+<input hidden="true" type="text" size="10" id="input1" value="4"><br>
+Camera Move Speed <input type="text" size="10" id="input2" value="2"><br>
+<input hidden="true" type="text" size="10" id="input3" value="0.0"><br>
+<table hidden="true">
+<tr>
+<td>Color 1 RGB</td>
+<td><input type="text" size="3" id="r1" value="202" onchange="updateColors()"></td>
+<td><input type="text" size="3" id="g1" value="10" onchange="updateColors()"></td>
+<td><input type="text" size="3" id="b1" value="50" onchange="updateColors()"></td>
+<td><span class="colorbox"></span></td>
+</tr>
+<tr>
+<td>Color 2 RGB</td>
+<td><input type="text" size="3" id="r2" value="120" onchange="updateColors()"></td>
+<td><input type="text" size="3" id="g2" value="10" onchange="updateColors()"></td>
+<td><input type="text" size="3" id="b2" value="210" onchange="updateColors()"></td>
+<td><span class="colorbox"></span></td>
+</tr>
+</table>
+<script type="text/javascript" src="https://cdn.rawgit.com/gpujs/gpu.js/45103b7f154a12ec639990c6896b21a053eb6a6c/bin/gpu.js"></script>
+<script type="text/javascript">
+var canW=600;
+var canH=600;
+var ctx;
+var key={up:false,down:false,left:false,right:false,space:false,shift:false,a:false,s:false,w:false,z:false};
+var fps=25;
+var pixelsize=4;
+var turnspeed=1/4;
+var renderdist=400;
+var widen=true;
+var movedistance=4;
+var light=[200,200,0];
+var shapes=[[0,50,40,0,40],[0,20,90,40,20],[0,-50,70,-30,40],[1,0,0,0,0,1,0]];//[i][0]=type - 0=sphere;1=plane
+var animate=true;
+
+var eye={x:10,y:20,z:-100,speed:0,strafespeed:0,
+xang:0,yang:0,zang:0,
+xangvel:0,yangvel:0,zangvel:0,vector:[],hvec:[],vvec:[],
+move(){
+	if(key.w){
+			eye.speed=movedistance;
+			
+		}else if(key.s){
+			eye.speed=-movedistance;
+			
+		}else{
+			eye.speed=0;
+		}
+		if(key.a && !key.d){
+			eye.strafespeed=-movedistance;
+		}else if (key.d){
+			eye.strafespeed=movedistance;
+		}else{
+			eye.strafespeed=0;
+		}
+		if(key.q){
+			eye.yang-=Math.PI/120;
+		}
+		if(key.e){
+			eye.yang+=Math.PI/120;
+		}
+		if(key.x && eye.xang>-Math.PI/2+Math.PI/120){
+			eye.xang-=Math.PI/120;
+		}
+		if(key.n2 && eye.xang<Math.PI/2-Math.PI/120){
+			eye.xang+=Math.PI/120;
+		}
+		eye.x+=eye.speed*Math.sin(eye.yang)*Math.cos(eye.xang) + eye.strafespeed*Math.cos(eye.yang);
+		eye.y+=eye.speed*Math.sin(eye.xang);
+		eye.z+=eye.speed*Math.cos(eye.yang)*Math.cos(eye.xang) - eye.strafespeed*Math.sin(eye.yang);
+		if(key.z){
+			light[0]-=10;
+			
+		}else if(key.c){
+			light[0]+=10;
+		}
+
+},
+	getVectors(){
+		this.vector= [Math.sin(this.yang)*Math.cos(this.xang),Math.sin(this.xang), Math.cos(this.yang)*Math.cos(this.xang)];
+		this.hvec=[Math.cos(this.yang),0,-Math.sin(this.yang)];
+		this.vvec=crossProduct(this.vector,this.hvec);
+	}
+};
+var MX,MY;
+
+function anglemod(a){//returns angle in [-pi,pi)
+return ((a+Math.PI)%(2*Math.PI)-Math.PI*(Math.sign(a+Math.PI)||1));
+}
+
+var offset;
+
+function kdown(e){
+	var event=window.event ? window.event : e;
+	if(event.keyCode===37){key.left=true}
+	if(event.keyCode===38){event.preventDefault();key.up=true}
+	if(event.keyCode===39){key.right=true}
+	if(event.keyCode===40){event.preventDefault();key.down=true}
+	if(event.keyCode===32){event.preventDefault();key.space=true}
+	if(event.keyCode===16){event.preventDefault();key.shift=true}
+	if(event.keyCode===65){event.preventDefault();key.a=true}
+	if(event.keyCode===83){event.preventDefault();key.s=true}
+	if(event.keyCode===68){event.preventDefault();key.d=true}
+	if(event.keyCode===87){event.preventDefault();key.w=true}
+	if(event.keyCode===90){event.preventDefault();key.z=true}
+	if(event.keyCode===67){event.preventDefault();key.c=true}
+	if(event.keyCode===69){event.preventDefault();key.e=true}
+	if(event.keyCode===81){event.preventDefault();key.q=true}
+	if(event.keyCode===88){event.preventDefault();key.x=true}
+	if(event.keyCode===50){key.n2=true}
+	
+	animate=true;
+
+}
+function kup(e){
+	var event=window.event ? window.event : e;
+	if(event.keyCode===37){key.left=false}
+	if(event.keyCode===38){key.up=false}
+	if(event.keyCode===39){key.right=false}
+	if(event.keyCode===40){key.down=false}
+	if(event.keyCode===32){key.space=false}
+	if(event.keyCode===16){key.shift=false}
+	if(event.keyCode===65){key.a=false}
+	if(event.keyCode===83){key.s=false}
+	if(event.keyCode===68){key.d=false}
+	if(event.keyCode===87){key.w=false}
+	if(event.keyCode===90){key.z=false}
+	if(event.keyCode===67){key.c=false}
+	if(event.keyCode===69){key.e=false}
+	if(event.keyCode===81){key.q=false}
+	if(event.keyCode===88){key.x=false}
+	if(event.keyCode===50){key.n2=false}
+	
+	animate=false;
+	for(i in key){
+		if(key[i]===true){
+			animate=true;
+		}
+	}
+}
+function init(){
+	document.addEventListener("keydown",kdown);
+	document.addEventListener("keyup",kup);
+	updateInputs();
+	draw();
+	play();
+}
+function play(){
+	cancelAnimationFrame(framecount);
+	animate=true;
+	frame();
+}
+function pause(){
+	animate=false;
+}
+
+function vecAdd(u,v){
+return [u[0]+v[0],u[1]+v[1],u[2]+v[2]]
+}
+function vecScale(k,u){
+return [k*u[0],k*u[1],k*u[2]];
+}
+
+function crossProduct(u,v){
+return [u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
+}
+function gradient(x){
+return "rgb("+Math.ceil(r2+x*(r1-r2))+","+Math.ceil(g2+x*(g1-g2))+","+Math.ceil(b2+x*(b1-b2))+")";
+}
+const gpu = new GPU();
+gpu.addFunction(function dotProduct(u1,u2,u3,v1,v2,v3) {
+  return (u1*v1+u2*v2+u3*v3);
+}, {returnType: 'Number' });
+
+function planeHit(c1,c2,c3,v1,v2,v3,p1,p2,p3,n1,n2,n3){//start, ray, point, normal
+	var r1=p1-c1;
+	var r2=p2-c2;
+	var r3=p3-c3;
+	return (r1*n1 + r2*n2 + r3*n3)/(v1*n1 + v2*n2 + v3*n3)//dotProduct(r1,r2,r3,n1,n2,n3)/dotProduct(v1,v2,v3,n1,n2,n3);
+}
+gpu.addFunction(planeHit);
+
+function sphereHit(px,py,pz, vx1,vy1,vz1,  sphx,sphy,sphz,sphr){
+		var cx=sphx;
+		var cy=sphy;
+		var cz=sphz;
+		var radius=sphr;
+		
+		var c1=2*vx1*(px-cx)+2*vy1*(py-cy)+2*vz1*(pz-cz);
+		var c0=(px-cx)*(px-cx)+(py-cy)*(py-cy)+(pz-cz)*(pz-cz) - radius*radius;
+		var discriminant = c1*c1 - 4*c0;
+		if(discriminant > 0){
+			return (-c1-Math.sqrt(discriminant))/2;
+		}else{
+			return -1;
+		}
+	}
+gpu.addFunction(sphereHit);
+
+const trace = gpu.createKernel(function(x0,y0,z0,xvel,yvel,zvel,li,shapes) {
+	var rx=x0;
+	var ry=y0;
+	var rz=z0;
+	var r=255;
+	var g=255;
+	var b=255;
+	
+	var shapehit=-1;
+		
+	var vx=xvel[this.thread.x][this.thread.y];
+	var vy=yvel[this.thread.x][this.thread.y];
+	var vz=zvel[this.thread.x][this.thread.y];
+	var norm=Math.sqrt(vx*vx + vy*vy + vz*vz);
+	
+	vx/=norm;
+	vy/=norm;
+	vz/=norm;
+	
+	function lightvisible(px,py,pz,li,shapes){
+		var dist = Math.sqrt((px-li[0])*(px-li[0]) + (py-li[1])*(py-li[1]) + (pz-li[2])*(pz-li[2]));
+		var ux=(li[0]-px)/dist;
+		var uy=(li[1]-py)/dist;
+		var uz=(li[2]-pz)/dist;
+		
+		for(var i=0;i<4;i++){
+		var t=-1;
+		if(shapes[i][0]===0){
+			t=sphereHit(px,py,pz, ux,uy,uz, shapes[i][1],shapes[i][2],shapes[i][3],shapes[i][4]);
+		}
+			if(t>=-0.1){
+				return 0;
+			}
+		}
+		return 1;
+	}
+	var totaldist=-1;
+	for(var i=0;i<4;i++){
+		var t=-1;
+		if(shapes[i][0]===0){
+			t=sphereHit(x0,y0,z0, vx,vy,vz, shapes[i][1],shapes[i][2],shapes[i][3],shapes[i][4]);
+		}
+		if(t>0 && (t<totaldist || totaldist<0)){
+			totaldist=t;
+			shapehit=i;
+		}
+	}
+	
+	if(totaldist<0){//if it doesn't hit the sphere
+		totaldist=planeHit(x0,y0,z0, vx,vy,vz, 0,0,0, 0,1,0);
+		if(totaldist>0){//if it hits the plane
+			if(lightvisible(x0 + vx * totaldist,y0 + vy * totaldist,z0 + vz * totaldist, li, shapes)===1){
+				r=100;
+				g=100;
+				b=100;
+				
+			}else{
+				r=0;
+				g=0;
+				b=0;
+			}
+
+		}else{
+			r=0;
+			g=120;
+		}
+	}else{
+		var intx=rx+vx*totaldist;
+		var inty=ry+vy*totaldist;
+		var intz=rz+vz*totaldist;
+		
+		var normalx = intx - shapes[shapehit][1];
+		var normaly = inty - shapes[shapehit][2];
+		var normalz = intz - shapes[shapehit][3];
+		var normallength=Math.sqrt(normalx*normalx+normaly*normaly+normalz*normalz);
+		normalx/=normallength;
+		normaly/=normallength;
+		normalz/=normallength;
+
+		var vdotn=dotProduct(normalx,normaly,normalz,vx,vy,vz);//(normalx*vx + normaly * vy + normalz * vz);
+		var refx=vx-2*vdotn*normalx;
+		var refy=vy-2*vdotn*normaly;
+		var refz=vz-2*vdotn*normalz;
+	
+		
+		var refdist=-1;
+		var refhit=-1;
+		for(var i=0;i<4;i++){
+			var t=-1;
+			if(shapes[i][0]===0){
+				t=sphereHit( intx,inty,intz, refx,refy,refz, shapes[i][1],shapes[i][2],shapes[i][3],shapes[i][4]);
+			}else if(shapes[i][0]===1){
+				t=planeHit(intx,inty,intz,refx,refy,refz,shapes[i][1],shapes[i][2],shapes[i][3],shapes[i][4],shapes[i][5],shapes[i][6]);
+			}
+				if(t>0 && (t<refdist || refdist<0)){
+					refdist=t;
+					refhit=i;
+				}
+			}
+		
+		if(refhit===0 || shapehit===0){
+			r-=0;
+			b-=120;
+		}
+		if(refhit===1 || shapehit===1){
+			r-=200;
+			g-=0;
+		}
+		if(refhit===2 || shapehit===2){
+			r-=0;
+			g-=120;
+		}
+		if(refhit===3 || shapehit===3){
+			r=r/4+90;
+			g=r/4+90;
+			b=r/4+90;
+		}
+		
+		if(lightvisible(intx,inty,intz,li,shapes)===0){
+			r*=0.5;
+			g*=0.5;
+			b*=0.5;
+		}
+		r*=0.5-vdotn;
+		g*=0.5-vdotn;
+		b*=0.5-vdotn;
+	}
+	
+	r=Math.floor(Math.min(r,255))/255;
+	g=Math.floor(Math.min(g,255))/255;
+	b=Math.floor(Math.min(b,255))/255;
+	this.color(r,g,b);
+})
+  .setOutput([600, 600])
+  .setOutputToTexture(false)
+  .setGraphical(true)
+  .setLoopMaxIterations(Math.ceil(100000));
+
+const can = trace._canvas;
+document.getElementById('canholder').appendChild(can);
+
+function updateInputs(){
+	pixelsize=Math.max(parseInt(document.getElementById("input1").value),1);
+	movedistance=parseFloat(document.getElementById("input2").value);
+	
+}
+function draw(){
+	var time=new Date().getTime();
+	updateInputs();
+	eye.getVectors();
+	var xVelArray=[];
+	var yVelArray=[];
+	var zVelArray=[];
+	for(var i=0;i<canW;i++){
+		xVelArray[i]=[];
+		yVelArray[i]=[];
+		zVelArray[i]=[];
+		for(var j=0;j<canH;j++){
+			var vec1=vecAdd(vecAdd( vecScale((i/300 - 1),eye.hvec), vecScale((j/300-1),eye.vvec)), eye.vector);
+			xVelArray[i].push(vec1[0]);
+			yVelArray[i].push(vec1[1]);
+			zVelArray[i].push(vec1[2]);
+		}
+	}
+	trace(eye.x,eye.y,eye.z,xVelArray,yVelArray,zVelArray,light,shapes);
+
+	//console.log((new Date().getTime() - time) +" ms");
+}
+
+var framecount=0;
+function frame(){
+	if(animate){
+		eye.move();
+		if(framecount%1===0){
+			draw();
+		}
+	}
+	framecount=requestAnimationFrame(frame);
+}
+</script>
+</body>
+</html>
