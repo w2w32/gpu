@@ -264,7 +264,7 @@ const trace = gpu.createKernel(function(x0,y0,z0,dir,hvec,vvec,li,shapes,shapeco
 		var uy=(li[1]-py)/dist;
 		var uz=(li[2]-pz)/dist;
 		
-		for(var i=1;i<5;i++){
+		for(var i=1;i<shapecount;i++){
 			var t=-1;
 			if(shapes[i][0]===0){
 				t=sphereHit(px,py,pz, ux,uy,uz, shapes[i][1],shapes[i][2],shapes[i][3],shapes[i][4]);
@@ -292,7 +292,7 @@ const trace = gpu.createKernel(function(x0,y0,z0,dir,hvec,vvec,li,shapes,shapeco
 		var lasthit=shapehit;
 		var dist=-1;
 		bounce++;
-		for(var i=0;i<6;i++){//number of objects
+		for(var i=0;i<shapecount;i++){//number of objects
 
 			if(i!==lasthit){
 				var t=-1;
