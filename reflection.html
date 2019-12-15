@@ -2,47 +2,6 @@
 <html>
 <head>
 <title></title>
-<style>
-body{
-color:white;
-}
-canvas{
-position:relative;
-}
-#can0{
-border:2px solid #333;
-}
-
-#display{
-z-index:2;
-position:relative;
-font-family: menlo, sans-serif;
-color:#0f0;
-left:400px;
-bottom:140px;
-}
-
-td{
-background-color: black;
-width:99px;
-padding:0px;
-border-radius:4px;
-text-align:center;
-}
-#display_x,#display_y,#display_z{
-height:75px;
-font-size:1.5em;
-}
-.check{
-vertical-align:top;
-
-}
-.colorbox{
-width:12px;
-height:12px;
-display:inline-block;
-}
-</style>
 </head>
 <body bgcolor="#222222" onload="init()">
 
@@ -50,25 +9,9 @@ display:inline-block;
 </div>
 <br>
 
-Bounces <input type="text" size="10" id="input1" value="2"><br>
+Bounces <input type="text" size="10" id="input1" value="6"><br>
 Camera Move Speed <input type="text" size="10" id="input2" value="2"><br>
 <input hidden="true" type="text" size="10" id="input3" value="0.0"><br>
-<table hidden="true">
-<tr>
-<td>Color 1 RGB</td>
-<td><input type="text" size="3" id="r1" value="202" onchange="updateColors()"></td>
-<td><input type="text" size="3" id="g1" value="10" onchange="updateColors()"></td>
-<td><input type="text" size="3" id="b1" value="50" onchange="updateColors()"></td>
-<td><span class="colorbox"></span></td>
-</tr>
-<tr>
-<td>Color 2 RGB</td>
-<td><input type="text" size="3" id="r2" value="120" onchange="updateColors()"></td>
-<td><input type="text" size="3" id="g2" value="10" onchange="updateColors()"></td>
-<td><input type="text" size="3" id="b2" value="210" onchange="updateColors()"></td>
-<td><span class="colorbox"></span></td>
-</tr>
-</table>
 <script type="text/javascript" src="https://cdn.rawgit.com/gpujs/gpu.js/45103b7f154a12ec639990c6896b21a053eb6a6c/bin/gpu.js"></script>
 <script type="text/javascript">
 var canW=600;
@@ -280,43 +223,7 @@ function yCylHit(px,py,pz, vx,vy,vz,  cx,cz,cr){
 	}
 gpu.addFunction(yCylHit);
 
-function yTorHit(px,py,pz, vx,vy,vz, cx,cy,cz, rbig, rsmall){
-	var sx=px-cx;
-	var sy=py-cy;
-	var sz=pz-cz;
-	var R2=rbig*rbig;
-	
-
-	var G = 4*R2*(vx*vx + vy*vy + vz*vz);
-	var H = 8*R2*(sx*vx + sz*vz);
-	var I = 4*R2*(sx*sx + sz*sz);
-	var J = vx*vx + vy*vy + vz*vz;
-	var K = 2*(sx*vx + sy*vy + sz*vz);
-	var L = sx*sx + sy*sy + sz*sz + R2 - rsmall*rsmall;
-	
-	var A=J*J;
-	var B=2*J*K;
-	var C=2*J*L+K*K;
-	var D=2*K*L-H;
-	var E=L*L-I;
-	
-	var t=10;
-	var f=(A*t*t*t*t + B*t*t*t + C*t*t + D*t + E);
-	for(var i=0;i<8;i++){
-		t-=f/(4*A*t*t*t + 3*B*t*t + 2*C*t + D);
-		f=(A*t*t*t*t + B*t*t*t + C*t*t + D*t + E);
-		console.log(t,f);
-	}
-	
-	if(f < 0.1){
-		return t;
-	}else{
-
-		
-		return([A,B,C,D,E]);
-	}
-}
-const trace = gpu.createKernel(function(x0,y0,z0,dir,hvec,vvec,li,shapes,maxbounce) {
+const trace = gpu.createKernel(function(x0,y0,z0,dir,hvec,vvec,li,shapes,shapecount,maxbounce) {
 	var rx=x0;
 	var ry=y0;
 	var rz=z0;
@@ -369,7 +276,7 @@ const trace = gpu.createKernel(function(x0,y0,z0,dir,hvec,vvec,li,shapes,maxboun
 		var lasthit=shapehit;
 		var dist=-1;
 		bounce++;
-		for(var i=0;i<5;i++){//number of objects
+		for(var i=0;i<shapecount;i++){//number of objects
 
 			if(i!==lasthit){
 				var t=-1;
@@ -524,7 +431,7 @@ function draw(){
 	eye.getVectors();
 
 	trace(eye.x,eye.y,eye.z,eye.vector,eye.hvec,eye.vvec,
-	light,shapes,maxbounce);
+	light,shapes,shapes.length,maxbounce);
 
 	//console.log((new Date().getTime() - time) +" ms");
 }
@@ -540,5 +447,46 @@ function frame(){
 	framecount=requestAnimationFrame(frame);
 }
 </script>
+<style>
+body{
+color:white;
+}
+canvas{
+position:relative;
+}
+#can0{
+border:2px solid #333;
+}
+
+#display{
+z-index:2;
+position:relative;
+font-family: menlo, sans-serif;
+color:#0f0;
+left:400px;
+bottom:140px;
+}
+
+td{
+background-color: black;
+width:99px;
+padding:0px;
+border-radius:4px;
+text-align:center;
+}
+#display_x,#display_y,#display_z{
+height:75px;
+font-size:1.5em;
+}
+.check{
+vertical-align:top;
+
+}
+.colorbox{
+width:12px;
+height:12px;
+display:inline-block;
+}
+</style>
 </body>
 </html>
