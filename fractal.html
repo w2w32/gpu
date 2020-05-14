@@ -1,0 +1,556 @@
+<!doctype HTML>
+<html>
+<head>
+<title></title>
+<style>
+body{
+color:white;
+}
+canvas{
+position:relative;
+}
+#can0{
+border:2px solid #333;
+}
+
+#display{
+z-index:2;
+font-family: menlo, sans-serif;
+color:#0f0;
+left:400px;
+bottom:140px;
+}
+
+#display td{
+background-color: black;
+width:99px;
+padding:0px;
+border-radius:4px;
+text-align:center;
+}
+#display_x,#display_y,#display_z{
+height:75px;
+font-size:1.5em;
+}
+.check{
+vertical-align:top;
+
+}
+.colorbox{
+width:12px;
+height:12px;
+display:inline-block;
+}
+.tile{
+width:12px;
+height:12px;
+border:1px solid #000;
+background-color:#fff;
+}
+#e_holder{
+position:absolute;
+top:20px;
+left:620px;
+}
+</style>
+</head>
+<body bgcolor="#222222" onload="init()">
+<span id="canholder">
+</span>
+<div id="e_holder">
+Shape Editor
+<table id="editor">
+</table>
+</div>
+<br>
+Fractal Order <input type="text" size="4" id="input1" value="3"><br>
+Camera Move Speed <input type="text" size="8" id="input2" value="0.5"><br>
+Shadow Quality <input type="text" size="8" id="input3" value="8"><br>
+<table>
+<tr>
+<td>Color x </td>
+<td><input type="text" size="3" id="r1" value="255"></td>
+<td><input type="text" size="3" id="g1" value="0"></td>
+<td><input type="text" size="3" id="b1" value="0"></td>
+<td><span class="colorbox"></span></td>
+</tr>
+<tr>
+<td>Color y </td>
+<td><input type="text" size="3" id="r2" value="255"></td>
+<td><input type="text" size="3" id="g2" value="255"></td>
+<td><input type="text" size="3" id="b2" value="0"></td>
+<td><span class="colorbox"></span></td>
+</tr>
+<td>Color z </td>
+<td><input type="text" size="3" id="r3" value="255"></td>
+<td><input type="text" size="3" id="g3" value="127"></td>
+<td><input type="text" size="3" id="b3" value="0"></td>
+<td><span class="colorbox"></span></td>
+</tr>
+</table>
+<button onclick="updateInputs()">Update</button>
+
+<script type="text/javascript" src="https://cdn.rawgit.com/gpujs/gpu.js/45103b7f154a12ec639990c6896b21a053eb6a6c/bin/gpu.js"></script>
+<script type="text/javascript">
+var canW=600;
+var canH=600;
+var key={up:false,down:false,left:false,right:false,space:false,shift:false,a:false,s:false,w:false,z:false,x:false,n2:false};
+var fps=30;
+var pixelsize;
+var light=[20,80,-20];
+var fractalorder;
+var widen=true;
+var movedistance, shadowdetail;
+var fracdata = [[[1,1,1],[0,0,0],[1,1,1]],
+			   [[1,0,1],[0,0,0],[1,0,1]],
+			   [[1,1,1],[0,0,0],[1,1,1]]];
+var bitdata = 0;
+var animate;
+
+var eye={x:20,y:30,z:-30,speed:0,strafespeed:0,
+xang:0,yang:0,zang:0,
+xangvel:0,yangvel:0,zangvel:0,vector:[],hvec:[],vvec:[],
+move(){
+	if(key.w){
+			eye.speed=movedistance;
+			
+		}else if(key.s){
+			eye.speed=-movedistance;
+			
+		}else{
+			eye.speed=0;
+		}
+		if(key.a && !key.d){
+			eye.strafespeed=-movedistance;
+		}else if (key.d){
+			eye.strafespeed=movedistance;
+		}else{
+			eye.strafespeed=0;
+		}
+		if(key.q){
+			eye.yang-=Math.PI/120;
+		}
+		if(key.e){
+			eye.yang+=Math.PI/120;
+		}
+		if(key.x && eye.xang-Math.PI/120>-Math.PI/2){
+			eye.xang-=Math.PI/120;
+		}
+		if(key.n2 && eye.xang+Math.PI/120<Math.PI/2){
+			eye.xang+=Math.PI/120;
+		}
+		if(key.left){
+			light[0]--;
+		}
+		if(key.right){
+			light[0]++;
+		}
+		if(key.up){
+			light[1]++;
+		}
+		if(key.down){
+			light[1]--;
+		}
+		eye.x+=eye.speed*Math.sin(eye.yang)*Math.cos(eye.xang) + eye.strafespeed*Math.cos(eye.yang);
+		eye.y+=eye.speed*Math.sin(eye.xang);
+		eye.z+=eye.speed*Math.cos(eye.yang)*Math.cos(eye.xang) - eye.strafespeed*Math.sin(eye.yang);
+},
+	getVectors(){
+		this.vector= [Math.sin(this.yang)*Math.cos(this.xang),Math.sin(this.xang), Math.cos(this.yang)*Math.cos(this.xang)];
+		this.hvec=[Math.cos(this.yang),0,-Math.sin(this.yang)];
+		this.vvec=crossProduct(this.vector,this.hvec);
+	}
+};
+var MX,MY;
+
+var offset;
+
+function kdown(e){
+	var event=window.event ? window.event : e;
+	if(event.keyCode===37){key.left=true}
+	if(event.keyCode===38){event.preventDefault();key.up=true}
+	if(event.keyCode===39){key.right=true}
+	if(event.keyCode===40){event.preventDefault();key.down=true}
+	if(event.keyCode===32){event.preventDefault();key.space=true}
+	if(event.keyCode===16){event.preventDefault();key.shift=true}
+	if(event.keyCode===65){event.preventDefault();key.a=true}
+	if(event.keyCode===83){event.preventDefault();key.s=true}
+	if(event.keyCode===68){event.preventDefault();key.d=true}
+	if(event.keyCode===87){event.preventDefault();key.w=true}
+	if(event.keyCode===90){event.preventDefault();key.z=true}
+	if(event.keyCode===67){event.preventDefault();key.c=true}
+	if(event.keyCode===69){event.preventDefault();key.e=true}
+	if(event.keyCode===81){event.preventDefault();key.q=true}
+	if(event.keyCode===88){event.preventDefault();key.x=true}
+	if(event.keyCode===50){key.n2=true}
+	
+	for(i in key){
+		if(key[i]===true){
+			animate=true;
+		}
+	}
+
+}
+function kup(e){
+	var event=window.event ? window.event : e;
+	if(event.keyCode===37){key.left=false}
+	if(event.keyCode===38){key.up=false}
+	if(event.keyCode===39){key.right=false}
+	if(event.keyCode===40){key.down=false}
+	if(event.keyCode===32){key.space=false}
+	if(event.keyCode===16){key.shift=false}
+	if(event.keyCode===65){key.a=false}
+	if(event.keyCode===83){key.s=false}
+	if(event.keyCode===68){key.d=false}
+	if(event.keyCode===87){key.w=false}
+	if(event.keyCode===90){key.z=false}
+	if(event.keyCode===67){key.c=false}
+	if(event.keyCode===69){key.e=false}
+	if(event.keyCode===81){key.q=false}
+	if(event.keyCode===88){key.x=false}
+	if(event.keyCode===50){key.n2=false}
+	
+	animate=false;
+	for(i in key){
+		if(key[i]===true){
+			animate=true;
+		}
+	}
+}
+function makeboxes(){
+	var res=""
+	for(var h=0;h<3;h++){
+		res+="<tr></tr>";
+		for(var i=0;i<3;i++){
+		res+="<tr>";
+		for(var j=0;j<3;j++){
+		res+="<td class = \"tile\" id="+h+"-"+i+"-"+j+" onclick=\"togglebox("+h+","+i+","+j+")\"></td>";
+		}
+		res+="</tr>\n"
+		}
+		
+	}
+	document.getElementById("editor").innerHTML=res;
+		for(var h=0;h<3;h++){
+			for(var i=0;i<3;i++){
+				for(var j=0;j<3;j++){
+					if(fracdata[h][i][j]){
+						document.getElementById(""+h+"-"+i+"-"+j).style.backgroundColor="#444";
+					}else{
+						document.getElementById(""+h+"-"+i+"-"+j).style.backgroundColor="#fff";
+					}
+				}
+			}
+		}
+}
+
+function updatebits(){
+	bitdata = 0;
+	for(var h=0;h<3;h++){
+		for(var i=0;i<3;i++){
+			for(var j=0;j<3;j++){
+				bitdata += Math.pow(2, 9*h + 3*i + j)*(1-fracdata[h][i][j]);
+			}
+		}
+	}
+	console.log(bitdata.toString(2));
+}
+function getbit(h,i,j){
+	var pos = 9*h + 3*i + j
+	return bitdata;
+}
+
+function togglebox(h,i,j){
+	if(fracdata[h][2-i][j]){
+	document.getElementById(""+h+"-"+i+"-"+j).style.backgroundColor="#fff";
+	fracdata[h][2-i][j]=0;
+	}else{
+	document.getElementById(""+h+"-"+i+"-"+j).style.backgroundColor="#444";
+	fracdata[h][2-i][j]=1;
+	}
+	updateInputs();
+}
+
+function init(){
+	document.addEventListener("keydown",kdown);
+	document.addEventListener("keyup",kup);
+	updateInputs();
+	draw();
+	play();
+	animate=false;
+	makeboxes();
+}
+function play(){
+	cancelAnimationFrame(framecount);
+	animate=true;
+	frame();
+}
+var r1,g1,b1,r2,g2,b2;
+var particles=[];
+
+
+function vecAdd(u,v){
+return [u[0]+v[0],u[1]+v[1],u[2]+v[2]]
+}
+function vecScale(k,u){
+return [k*u[0],k*u[1],k*u[2]];
+}
+function dotProduct(u,v){
+return [u[0]*v[0]+u[1]*v[1]+u[2]*v[2]]
+}
+function crossProduct(u,v){
+return [u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
+}
+function gradient(x){
+return "rgb("+Math.ceil(r2+x*(r1-r2))+","+Math.ceil(g2+x*(g1-g2))+","+Math.ceil(b2+x*(b1-b2))+")";
+}
+const gpu = new GPU();
+
+function inFractal(x0,y0,z0,order,length,cubedata){
+	var l = length;
+	var n=order;
+	var x=x0/l;
+	var y=y0/l;
+	var z=z0/l;
+
+	if(x>0 && x<1 && y>0 && y<1 && z>0 && z<1){
+		for(var i=0; i<order;i++){
+			var frx=floor((pow(3,i+1)/n) * ((x*n)%(n/pow(3,i))) );
+			var fry=floor((pow(3,i+1)/n) * ((y*n)%(n/pow(3,i))) );
+			var frz=floor((pow(3,i+1)/n) * ((z*n)%(n/pow(3,i))) );
+			if(cubedata[frz][fry][frx] === 1){return 0}
+			}
+			return 1;
+	}else{
+		return 0;
+	}
+}
+gpu.addFunction(inFractal);
+
+function norm(vx,vy,vz){
+	return Math.sqrt(vx*vx + vy*vy + vz*vz);
+}
+gpu.addFunction(norm);
+
+const trace = gpu.createKernel(function(x0,y0,z0, dir,hvec,vvec, order,size, fracdata,
+lx,ly,lz, shd, cx,cy,cz) {
+	var gridres=size/(Math.pow(3,order));
+	var hitplane=0;
+	var r=0;
+	var g=0;
+	var b=0;
+	
+	var vx=((this.thread.x/300 - 1)*hvec[0] + (this.thread.y/300 - 1)*vvec[0] + dir[0]);
+	var vy=((this.thread.x/300 - 1)*hvec[1] + (this.thread.y/300 - 1)*vvec[1] + dir[1]);
+	var vz=((this.thread.x/300 - 1)*hvec[2] + (this.thread.y/300 - 1)*vvec[2] + dir[2]);
+	var spd=norm(vx,vy,vz);
+	vx/=spd;
+	vy/=spd;
+	vz/=spd;
+	
+	var tinystep=gridres/20;
+	
+	var rx=x0;
+	var ry=y0;
+	var rz=z0;
+	
+	//set to black if it doesn't hit cube
+	var t0x = (-rx) / vx; 
+	var t1x = (size - rx) / vx;
+	var t0y = (-ry) / vy;
+	var t1y = (size - ry) / vy;
+	var t0z = (-rz) / vz;
+	var t1z = (size - rz) / vz;
+	
+	var txmin=Math.min(t0x,t1x);
+	var tymin=Math.min(t0y,t1y);
+	var tzmin=Math.min(t0z,t1z);
+	var txmax=Math.max(t0x,t1x);
+	var tymax=Math.max(t0y,t1y);
+	var tzmax=Math.max(t0z,t1z);
+	
+	if(txmin>tymax || tymin>txmax
+	|| txmin>tzmax || tzmin>txmax
+	|| tzmin>tymax || tymin>tzmax){
+		r=201;
+		g=201;
+		b=201;
+	}
+	
+	//align to grid and start checking each plane intersection
+	var f;
+	if(vx>0){
+	f=(Math.floor(rx/gridres))*gridres;
+	}else{
+	f=(Math.ceil(rx/gridres))*gridres;
+	}
+	ry+=(f-rx)*vy/vx;
+	rz+=(f-rx)*vz/vx;
+	rx=f;
+	while(r <= 200){
+		rx+=gridres*Math.sign(vx);
+		ry+=gridres*vy/Math.abs(vx);
+		rz+=gridres*vz/Math.abs(vx);
+		if(inFractal(rx+vx*tinystep,ry,rz,order,size,fracdata) === 1){
+			break;
+		}
+		r+=gridres;
+		}
+		r=norm(rx-x0,ry-y0,rz-z0);
+		
+		rx=x0;
+		ry=y0;
+		rz=z0;
+		if(vy>0){
+		f=(Math.floor(ry/gridres))*gridres;
+		}else{
+		f=(Math.ceil(ry/gridres))*gridres;
+		}
+		rx+=(f-ry)*vx/vy;
+		rz+=(f-ry)*vz/vy;
+		ry=f;
+	
+	while(g < 200){
+			ry+=gridres*Math.sign(vy);
+			rx+=gridres*vx/Math.abs(vy);
+			rz+=gridres*vz/Math.abs(vy);
+			if(inFractal(rx,ry+vy*tinystep,rz,order,size,fracdata) === 1){
+				break;
+			}
+			g+=gridres;
+		}
+		g=norm(rx-x0,ry-y0,rz-z0);
+		
+		rx=x0;
+		ry=y0;
+		rz=z0;
+	
+		if(vz>0){
+		f=(Math.floor(rz/gridres))*gridres;
+		}else{
+		f=(Math.ceil(rz/gridres))*gridres;
+		}
+		rx+=(f-rz)*vx/vz;
+		ry+=(f-rz)*vy/vz
+		rz=f;
+	while(b < 200){
+		rz+=gridres*Math.sign(vz);
+		rx+=gridres*vx/Math.abs(vz);
+		ry+=gridres*vy/Math.abs(vz);
+		if(inFractal(rx,ry,rz+vz*tinystep,order,size,fracdata) === 1){
+			break;
+		}
+			b+=gridres;
+		}
+		b=norm(rx-x0,ry-y0,rz-z0);
+		
+	if(r<g && r<b){
+		hitplane=1;
+		rx=x0+r*vx;
+		ry=y0+r*vy;
+		rz=z0+r*vz;
+	}else if(g<r && g<b){
+		hitplane=2;
+		rx=x0+g*vx;
+		ry=y0+g*vy;
+		rz=z0+g*vz;
+	}else{
+		hitplane=3;
+		rx=x0+b*vx;
+		ry=y0+b*vy;
+		rz=z0+b*vz;
+	}
+	if(rx<-1 || rx>size+1 || ry<-1 || ry>size+1 || rz<-1 || rz>size+1){
+		hitplane=0;
+	}
+	
+	if(hitplane !== 0){
+		if((hitplane === 1 && Math.sign(vx)===Math.sign(rx-lx))
+		 ||(hitplane === 2 && Math.sign(vy)===Math.sign(ry-ly))
+		 ||(hitplane === 3 && Math.sign(vz)===Math.sign(rz-lz))){
+			var refnorm=norm(lx-rx,ly-ry,lz-rz);
+			vx=(lx-rx)/refnorm;
+			vy=(ly-ry)/refnorm;
+			vz=(lz-rz)/refnorm;
+
+			
+			while(rx>0 && rx<size && ry>0 && ry<size && rz>0 && rz<size && norm(rx-lx,ry-ly,rz-lz)>gridres*2){
+				rx+=vx*gridres/shd;
+				ry+=vy*gridres/shd;
+				rz+=vz*gridres/shd;
+				if(inFractal(rx+vx*tinystep,ry+vy*tinystep,rz+vz*tinystep,order,size,fracdata) === 1){
+					hitplane+=3;
+					break;
+				}
+			}
+		}else{
+			hitplane+=3;
+		}
+		var dark=0.4;
+		if(hitplane == 1){
+			this.color(cx[0],cx[1],cx[2]);
+		}else if(hitplane == 2){
+			this.color(cy[0],cy[1],cy[2]);
+		}else if(hitplane == 3){
+			this.color(cz[0],cz[1],cz[2]);
+		}else if(hitplane == 4){
+			this.color(cx[0]*dark,cx[1]*dark,cx[2]*dark);
+		}else if(hitplane == 5){
+			this.color(cy[0]*dark,cy[1]*dark,cy[2]*dark);
+		}else if(hitplane == 6){
+			this.color(cz[0]*dark,cz[1]*dark,cz[2]*dark);
+		}
+	}else{
+		this.color(0,0,0);
+	}
+})
+  .setOutput([600, 600])
+  .setOutputToTexture(false)
+  .setGraphical(true)
+  .setLoopMaxIterations(65535);
+
+const can = trace._canvas;
+document.getElementById('canholder').appendChild(can);
+
+function updateInputs(){
+	fractalorder=parseFloat(document.getElementById("input1").value);
+	movedistance=parseFloat(document.getElementById("input2").value);
+	shadowdetail=parseFloat(document.getElementById("input3").value);
+	cx[0]=parseInt(document.getElementById("r1").value)/255;
+	cx[1]=parseInt(document.getElementById("g1").value)/255;
+	cx[2]=parseInt(document.getElementById("b1").value)/255;
+	cy[0]=parseInt(document.getElementById("r2").value)/255;
+	cy[1]=parseInt(document.getElementById("g2").value)/255;
+	cy[2]=parseInt(document.getElementById("b2").value)/255;
+	cz[0]=parseInt(document.getElementById("r3").value)/255;
+	cz[1]=parseInt(document.getElementById("g3").value)/255;
+	cz[2]=parseInt(document.getElementById("b3").value)/255;
+	
+	document.getElementsByClassName("colorbox")[0].style.backgroundColor="rgb("+cx[0]*255+","+cx[1]*255+","+cx[2]*255+")";
+	document.getElementsByClassName("colorbox")[1].style.backgroundColor="rgb("+cy[0]*255+","+cy[1]*255+","+cy[2]*255+")";
+	document.getElementsByClassName("colorbox")[2].style.backgroundColor="rgb("+cz[0]*255+","+cz[1]*255+","+cz[2]*255+")";
+	
+	draw();
+}
+function draw(){
+	eye.getVectors();
+
+	trace(eye.x,eye.y,eye.z,eye.vector,eye.hvec,eye.vvec,fractalorder,40,fracdata,
+	light[0],light[1],light[2],shadowdetail,cx,cy,cz);
+}
+var framecount=0;
+var cx=[1,.0,0];
+var cy=[1,1,0];
+var cz=[1,.5,0];
+function frame(){
+	if(animate){
+		eye.move();
+		if(framecount%1===0){
+			draw();
+		}
+	}
+	framecount=requestAnimationFrame(frame);
+}
+</script>
+</body>
+</html>
