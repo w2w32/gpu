@@ -1,0 +1,551 @@
+<!doctype HTML>
+<html>
+<head>
+<style>
+div{
+color:#fff;
+}
+canvas{
+position:relative;
+}
+#can0{
+border:2px solid #333;
+}
+#editor_table{
+position:absolute;
+top:20px;
+left:620px;
+}
+.module:hover{
+border-bottom: 5px solid #0f0
+}
+#mouse_follower{
+position:absolute;
+opacity:0.5;
+pointer-events: none
+}
+editor_table{
+z-index:4;
+}
+.module_label{
+font-family:sans-serif;
+background-color:#a22;
+padding:2px;
+
+}
+.primitive_label{
+background-color:#e33;
+}
+</style>
+</style>
+</head>
+<body bgcolor="#000" onload = "init()">
+<button onclick="updateCtry();rewriteShaders()">update shader</button><br>
+
+<canvas width="800" height="800" id="can0">
+
+</canvas>
+<table id="editor_table"><tr>
+<td>
+<div id="editor"></div></td>
+<td>
+<div id="palette"></div></td>
+</tr>
+<tr><td id="trashcan" style="font-size: 36px;color: #ccc">&#128465;</td></tr>
+</table>
+<div id="renderer"></div>
+<div id="mouse_follower"></div>
+<script type="text/javascript">
+var can0, glctx;
+var program;
+var key={up:false,down:false,left:false,right:false,space:false,shift:false,a:false,s:false,w:false,z:false,x:false,n2:false};
+var animate;
+
+var ctry=[["box", "0.5", "20.", "10"],["radial", "yz", "100.", "22."],["radial", "zx", "30.", "22."],["translate", "0.", "0.", "100."]];
+//Coordinate Transform aRraY
+
+var movespeed=1;
+var eye={pos:[0,0,0],speed:0,strafespeed:0,
+	xang:0,yang:0,zang:0,
+	vector:[],hvec:[],vvec:[],
+	getVectors(){
+		this.vector= [Math.sin(this.yang)*Math.cos(this.xang),Math.sin(this.xang), Math.cos(this.yang)*Math.cos(this.xang)];
+		this.hvec=[Math.cos(this.yang),0,-Math.sin(this.yang)];
+		this.vvec=crossProduct(this.vector,this.hvec);
+	},
+	move(){
+		if(key.w){
+			this.speed=movespeed;
+			
+		}else if(key.s){
+			this.speed=-movespeed;
+			
+		}else{
+			this.speed=0;
+		}
+		if(key.a && !key.d){
+			this.strafespeed=-movespeed;
+		}else if (key.d){
+			this.strafespeed=movespeed;
+		}else{
+			this.strafespeed=0;
+		}
+		if(key.q){
+			this.yang-=Math.PI/120;
+		}
+		if(key.e){
+			this.yang+=Math.PI/120;
+		}
+		if(key.x && eye.xang-Math.PI/120<Math.PI/2){
+			this.xang+=Math.PI/120;
+		}
+		if(key.n2 && eye.xang+Math.PI/120>-Math.PI/2){
+			this.xang-=Math.PI/120;
+		}
+
+		this.pos[0]+=eye.speed*Math.sin(eye.yang)*Math.cos(eye.xang) + eye.strafespeed*Math.cos(eye.yang);
+		this.pos[1]+=eye.speed*Math.sin(eye.xang);
+		this.pos[2]+=eye.speed*Math.cos(eye.yang)*Math.cos(eye.xang) - eye.strafespeed*Math.sin(eye.yang);
+
+	}
+}
+function kdown(e){
+	var event=window.event ? window.event : e;
+	
+	if(event.keyCode===37){key.left=true}
+	if(event.keyCode===38){event.preventDefault();key.up=true}
+	if(event.keyCode===39){key.right=true}
+	if(event.keyCode===40){event.preventDefault();key.down=true}
+	if(event.keyCode===32){event.preventDefault();key.space=true}
+	if(event.keyCode===16){event.preventDefault();key.shift=true}
+	if(event.keyCode===65){event.preventDefault();key.a=true}
+	if(event.keyCode===83){event.preventDefault();key.s=true}
+	if(event.keyCode===68){event.preventDefault();key.d=true}
+	if(event.keyCode===87){event.preventDefault();key.w=true}
+	if(event.keyCode===90){event.preventDefault();key.z=true}
+	if(event.keyCode===67){event.preventDefault();key.c=true}
+	if(event.keyCode===69){event.preventDefault();key.e=true}
+	if(event.keyCode===81){event.preventDefault();key.q=true}
+	if(event.keyCode===88){event.preventDefault();key.x=true}
+	if(event.keyCode===50){key.n2=true}
+	
+	for(i in key){
+		if(key[i]===true){
+			animate=true;
+		}
+	}
+}
+function kup(e){
+	var event=window.event ? window.event : e;
+	if(event.keyCode===37){key.left=false}
+	if(event.keyCode===38){key.up=false}
+	if(event.keyCode===39){key.right=false}
+	if(event.keyCode===40){key.down=false}
+	if(event.keyCode===32){key.space=false}
+	if(event.keyCode===16){key.shift=false}
+	if(event.keyCode===65){key.a=false}
+	if(event.keyCode===83){key.s=false}
+	if(event.keyCode===68){key.d=false}
+	if(event.keyCode===87){key.w=false}
+	if(event.keyCode===90){key.z=false}
+	if(event.keyCode===67){key.c=false}
+	if(event.keyCode===69){key.e=false}
+	if(event.keyCode===81){key.q=false}
+	if(event.keyCode===88){key.x=false}
+	if(event.keyCode===50){key.n2=false}
+	
+	animate=false;
+	for(i in key){
+		if(key[i]===true){
+			animate=true;
+		}
+	}
+}
+function crossProduct(u,v){
+return [u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
+}
+function init(){
+	document.addEventListener("keydown",kdown);
+	document.addEventListener("keyup",kup);
+	document.addEventListener("mousemove",mouseMoveEvent);
+	document.getElementById("editor_table").addEventListener("mousedown",mouseDownEvent);
+	
+	can0 = document.getElementById("can0");
+	glctx=can0.getContext("webgl2");
+	document.getElementById("renderer").innerText=(glctx.getParameter(glctx.getExtension("WEBGL_debug_renderer_info").UNMASKED_RENDERER_WEBGL));
+	glctx.viewport(0,0,glctx.drawingBufferWidth, glctx.drawingBufferHeight);
+	
+	buildEditor();
+	buildPalette();
+	program = glctx.createProgram();
+	rewriteShaders();
+	draw();
+	frame();
+}
+function draw(){
+	eye.getVectors();
+	
+	glctx.clearColor(0, 0, 0, 1.0);
+	glctx.clear(glctx.COLOR_BUFFER_BIT);
+	
+	updateUniforms();
+	glctx.drawArrays(glctx.POINTS, 0, 1);
+}
+function updateShaders(){
+	var vertex = glctx.createShader(glctx.VERTEX_SHADER);
+	glctx.shaderSource(vertex, document.getElementById("vertex_shader").innerHTML);
+	glctx.compileShader(vertex);
+	
+	var fragment = glctx.createShader(glctx.FRAGMENT_SHADER);
+	
+	glctx.shaderSource(fragment, document.getElementById("fragment_shader").innerHTML);
+	glctx.compileShader(fragment);
+	
+	glctx.attachShader(program, vertex);
+	glctx.attachShader(program, fragment);
+	glctx.linkProgram(program);
+	
+	console.log(glctx.getProgramInfoLog(program));
+
+	glctx.useProgram(program);
+	
+	updateUniforms();
+	
+	glctx.detachShader(program, vertex);
+	glctx.detachShader(program, fragment);
+	glctx.deleteShader(vertex);
+	glctx.deleteShader(fragment);
+}
+
+function updateUniforms(){
+	glctx.uniform3fv(glctx.getUniformLocation(program,"epos"), eye.pos);
+	glctx.uniform3fv(glctx.getUniformLocation(program,"evec"), eye.vector);
+	glctx.uniform3fv(glctx.getUniformLocation(program,"hvec"), eye.hvec);
+	glctx.uniform3fv(glctx.getUniformLocation(program,"vvec"), eye.vvec);
+	glctx.uniformMatrix3fv(glctx.getUniformLocation(program,"color"), false, [0,1,0.1, 0,1,0, 1,0.5,0]);
+
+}
+var framecount=0;
+function frame(){
+	if(animate){
+		eye.move();
+		if(framecount%1===0){
+			draw();
+		}
+	}
+	framecount=requestAnimationFrame(frame);
+}
+var heldElement = undefined;
+function mouseDownEvent(e){
+	var clickedModule;
+	if(e.srcElement.classList[0] === "module_label"){
+		clickedModule = e.srcElement.parentElement;
+	}else if(e.srcElement.id === "trashcan"){
+		heldElement = undefined;
+		document.getElementById("mouse_follower").innerHTML="";
+	}
+	if(clickedModule){
+		if(heldElement){
+			if(clickedModule.parentElement.id === "editor"){
+				new1 = document.getElementById("editor").insertBefore(heldElement, clickedModule.nextSibling);
+				heldElement = undefined;
+				document.getElementById("mouse_follower").innerHTML="";
+			}
+		}else{
+			if(clickedModule.parentElement.id === "palette"){
+				clickedModule = clickedModule.cloneNode(true);
+			}
+			heldElement = clickedModule;
+			document.getElementById("mouse_follower").appendChild(heldElement);
+		}
+	}
+
+}
+function mouseMoveEvent(e){
+	var follower = document.getElementById("mouse_follower");
+	if(heldElement){
+		follower.style.left = e.pageX +"px";
+		follower.style.top = (e.pageY+1) +"px";
+	}else{
+
+	}
+}
+function ModuleType(name,plnInputs, numInputs, primitive){
+	this.name = name;
+	this.plnInputs = plnInputs;
+	this.numInputs = numInputs;
+	this.primitive = primitive;//true for primitives; false for transformations
+}
+var moduleReqs = [];
+moduleReqs.push(new ModuleType("sphere",0,1,true));//r
+moduleReqs.push(new ModuleType("box",0,3,true));//l,w,h
+moduleReqs.push(new ModuleType("translate",0,3,false));//x,y,z
+moduleReqs.push(new ModuleType("rotate",1,1,false));//pln,theta
+moduleReqs.push(new ModuleType("scale",0,3,false));//x,y,z
+moduleReqs.push(new ModuleType("radial",1,2,false));//pln,r,n
+
+function buildModule(ct){
+	var module = document.createElement("div");
+	module.className = "module";
+		for(var m =0; m<moduleReqs.length; m++){
+		if(moduleReqs[m].name == ct[0]){
+			var label = moduleReqs[m].primitive ?  "primitive_label" : "";
+			module.innerHTML = '<span class="module_label '+label+'">'+ct[0]+'</span>';
+			var p;
+			for(p=0; p<moduleReqs[m].plnInputs;p++){
+				module.appendChild(planeInputHTML(ct[1+p]));
+			}
+			for(j = 0; j<moduleReqs[m].numInputs;j++){
+				module.appendChild(numberInputHTML(ct[1+p+j]));
+			}
+			break;
+			}
+		}
+	return module;
+}
+function buildPalette(){
+	for (var i =0;i<moduleReqs.length;i++){
+		document.getElementById("palette").appendChild(buildModule([moduleReqs[i].name,"","","","","",""]));
+	}
+}
+function buildEditor(){//build the editor from ctry
+	for (var i =0;i<ctry.length;i++){
+		document.getElementById("editor").appendChild(buildModule(ctry[i]));
+	}
+}
+
+function planeInputHTML(v){
+	var el = document.createElement("select");
+	el.innerHTML ="<option>xy</option><option>yz</option><option>zx</option>";
+	el.innerHTML+="<option>yx</option><option>zy</option><option>xz</option>";
+	el.value=v;
+	return el;
+}
+function numberInputHTML(v){
+	var el = document.createElement("input");
+	el.type="text";
+	el.size=3;
+	el.value=v;
+	return el;
+}
+
+for(var i =0;i<ctry.length;i++){
+	for(var j=0;j<ctry[i].length;j++){
+		if(!isNaN(ctry[i][j])){
+			ctry[i][j]=ctry[i][j].toString();
+			if(ctry[i][j].indexOf(".")==-1){
+				ctry[i][j]+=".";
+			}
+		}
+	}
+}
+function updateCtry(){
+	newctry = [];
+	var error = false;
+	moduleList = document.getElementById("editor").children;
+	for(var i=0;i<moduleList.length;i++){//loop through modules
+		newctry[i]=[];
+		inputList = moduleList[i].children;
+		for(var j=0;j<inputList.length;j++){//loop through inputs
+			currentValue = inputList[j].value;
+			currentValue = currentValue?currentValue:inputList[j].innerText;
+			if(inputList[j].tagName.toLowerCase() == "input"){//check for invalid number inputs
+				if(isNaN(currentValue)){
+					error=true;
+					console.log("invalid value "+currentValue+" at module "+i+" ("+inputList[0].innerText+") input "+j);
+				}else if(currentValue.indexOf(".")==-1){
+					currentValue+=".";
+				}
+			}
+			//console.log(currentValue);
+			newctry[i].push(currentValue);
+		}
+	}
+	if(!error){
+		ctry = newctry;
+	}
+}
+
+function rewriteShaders(){
+	var mark_start = "0->>";
+	var mark_end = "<<-0";
+	var old_shader = document.getElementById("fragment_shader").innerHTML;
+	var i_start = old_shader.search(mark_start)+mark_start.length;
+	var i_end = old_shader.search(mark_end)-2;
+	var new_txt;
+	if(i_start > 0 && i_end > i_start){
+		new_txt = "\n";
+		for(var i = ctry.length-1;i>0;i--){
+			switch(ctry[i][0]){
+				case "rotate":
+					//(string "xy","yz", etc);(number)
+					//x.xy = rotation_matrix(angle)*x.xy
+					new_txt+="x."+ctry[i][1]+"=rotation_matrix("+ctry[i][2]+")*x."+ctry[i][1]+";\n";
+					break;
+				case "translate":
+					//(number) x3
+					new_txt+="x-=vec3("+ctry[i].slice(1,4)+");";
+					break;
+				case "scale":
+					//(number) x3
+					new_txt+="x/=vec3("+ctry[i].slice(1,4)+");"
+					break;
+				case "radial":
+					new_txt+="x."+ctry[i][1]+"=radial(x."+ctry[i].slice(1,4)+");\n";
+					break;
+				default:
+					break;
+			}
+		}
+		switch(ctry[0][0]){
+			case "box":
+				new_txt += "float d1=Dist_Est_Box(x,vec3("+ctry[0].slice(1,4)+"));\n";
+				break;
+			case "sphere":
+				new_txt += "float d1=Dist_Est_Sphere(x,"+ctry[0][1]+");\n";
+				break;
+			default:
+				break;
+		}
+		
+		console.log(new_txt);
+		var text_top = old_shader.substring(0,i_start);
+		var text_bot = old_shader.substring(i_end,old_shader.length);
+		
+		document.getElementById("fragment_shader").innerHTML = text_top + new_txt + text_bot;
+		updateShaders();
+	}else{
+		console.log("can't rewrite shader from javascript");
+	}
+	console.log(document.getElementById("fragment_shader2").innerHTML.substring(i_start,i_end));
+}
+
+</script>
+<script type="text/webgl" id="vertex_shader">
+	precision highp float;
+	
+	void main() {
+		gl_Position = vec4(0., 0., 0.0, 1.0);
+		gl_PointSize = 800.;
+	}
+</script>
+<script type="text/webgl" id="fragment_shader2"></script>
+<script type="text/webgl" id="fragment_shader">
+	precision mediump float;
+	
+	const float rd_dist = 4294967296.;
+	const int max_bounce = 1;
+	const int max_ray_steps = 40;
+
+	uniform vec3 epos;
+	uniform vec3 evec;
+	uniform vec3 hvec;
+	uniform vec3 vvec;
+	uniform vec3 color;
+	
+	  
+	// Distance Estimator functions for shapes ================
+	float Dist_Est_Sphere(vec3 x, float r){
+		return length(x) - r;
+	}
+	float Dist_Est_Box(vec3 x, vec3 r){
+		return length(max(abs(x) - r, vec3(0.0) ));
+	}
+
+	float Dist_Est_Segment( vec3 x){
+		vec3 A = vec3(1.0,0.0,0.0);
+		vec3 B = vec3(1.0,0.0,0.0);
+		float r = 5.0;
+		float h = min(max(dot(x-A,B-A)/dot(B-A,B-A),0.0),1.0);
+		return length(x-(B-A)*h)-r;
+	}
+	float Dist_Est_Frame( vec3 x, vec3 b, float e){	
+		x = abs(x)-b;
+		vec3 q = abs(x+e)-e;
+		return min(min(
+      length(max(vec3(x.x,q.y,q.z),0.0))+min(max(x.x,max(q.y,q.z)),0.0),
+      length(max(vec3(q.x,x.y,q.z),0.0))+min(max(q.x,max(x.y,q.z)),0.0)),
+      length(max(vec3(q.x,q.y,x.z),0.0))+min(max(q.x,max(q.y,x.z)),0.0));
+	}
+
+	mat2 rotation_matrix(float ang){
+		return mat2(cos(ang),-sin(ang), sin(ang),cos(ang));
+	}
+	vec2 radial(in vec2 x, float r, float n){
+		
+		float arc = 6.283185307/n;
+		float sector = floor(atan(x.y,x.x)/arc+0.5);
+		float ang = arc*sector;
+		x.xy = rotation_matrix(ang)*x.xy;
+		x.x-=r;
+		return x;
+	}
+	// Coordinate Transformation function 
+
+	// final Distance Estimator
+	float DE(vec3 x0){
+	
+		
+		vec3 x=x0;
+
+		//begin here 0->>
+		x.z -= 200.;
+		x.xy=radial(x.xy,120.,8.);
+		//x.xy=rotation_matrix(0.2)*x.xy;
+		
+		x.zx=radial(x.zx,10.,4.);
+		float d1=Dist_Est_Box(x,vec3(2.0,4.0,40.0));
+		//<<-0 end here
+		
+		
+		//d1 = max(d1, length(x-vec3(0.0,0.,420.0))-350.); //clipping with max results in lower than true distance
+		//edge rounding would have to go here, it can't be a module  
+		return d1;
+	}
+	
+	vec3 frac_normal(vec3 pos, float ds){
+		return normalize(vec3(
+			DE(pos+vec3(ds,0.0,0.0))-DE(pos-vec3(ds,0.0,0.0)),
+			DE(pos+vec3(0.0,ds,0.0))-DE(pos-vec3(0.0,ds,0.0)),
+			DE(pos+vec3(0.0,0.0,ds))-DE(pos-vec3(0.0,0.0,ds))
+			));
+	}
+	
+	
+	void main() {
+		vec4 rgba = vec4(0.,0.,0.,0.);
+		vec3 vel = evec + (2.0*gl_PointCoord[0] - 1.0)*hvec + (2.0*gl_PointCoord[1] - 1.0)*vvec;
+		float spd = length(vel);
+		vel /= spd;
+		vec3 ray_start = epos;
+		
+		
+		float min_step_dist = 0.001;
+		for(int bounce=0; bounce<max_bounce; bounce++){
+		
+			int steps=0;
+			float dist = 0.0;
+			for(int i=0; i<max_ray_steps; i++){
+				vec3 p = ray_start + dist*vel;
+				float step_dist = DE(p);
+				dist += step_dist;
+				if(step_dist<min_step_dist){
+					rgba = vec4(.6-float(i)/float(max_ray_steps),0.4-float(i)/float(max_ray_steps),1.-float(i)/float(max_ray_steps),1.);
+					
+					vec3 n = frac_normal(p,step_dist);
+					vel = vel - 2.*dot(vel,n)*n;
+					ray_start = p + 1.*min_step_dist*n;
+					
+					break;
+				}
+			}
+			
+			//rgba += vec4(0.,1-float(steps)/8.0,0.,1.);
+		}
+		
+		gl_FragColor = rgba;
+		}
+		
+</script>
+</body>
+</html>
