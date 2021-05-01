@@ -1,3 +1,4 @@
+
 <!doctype HTML>
 <html>
 <head>
@@ -16,13 +17,18 @@ position:absolute;
 top:20px;
 left:620px;
 }
+module{
+overflow:hidden;
+height:1%;
+}
 .module:hover{
-border-bottom: 5px solid #0f0
+border-bottom: 5px solid #0f0;
 }
 #mouse_follower{
 position:absolute;
 opacity:0.5;
 pointer-events: none
+
 }
 editor_table{
 z-index:4;
@@ -31,11 +37,16 @@ z-index:4;
 font-family:sans-serif;
 background-color:#a22;
 padding:2px;
-
 }
-.primitive_label{
+.primitive_module{
+margin-top:8px;
+position:relative;
+right:5px;
+}
+.primitive_module > .module_label{
 background-color:#e33;
 }
+
 </style>
 </style>
 </head>
@@ -51,7 +62,10 @@ background-color:#e33;
 <td>
 <div id="palette"></div></td>
 </tr>
-<tr><td id="trashcan" style="font-size: 36px;color: #ccc">&#128465;</td></tr>
+<tr><td></td>
+<td>
+<textarea id="customtext"></textarea>
+</td></tr>
 </table>
 <div id="renderer"></div>
 <div id="mouse_follower"></div>
@@ -61,11 +75,13 @@ var program;
 var key={up:false,down:false,left:false,right:false,space:false,shift:false,a:false,s:false,w:false,z:false,x:false,n2:false};
 var animate;
 
-var ctry=[["box", "0.5", "20.", "10"],["radial", "yz", "100.", "22."],["radial", "zx", "30.", "22."],["translate", "0.", "0.", "100."]];
+var ctry=[["box", "0.1", "10.", "200"],["radial", "zx", "60.", "20."],["radial", "zx", "20.", "20."],
+		  ["sphere","2.0"],["radial", "zx", "10.", "5."],["translate", "0.", "-10.", "0."],
+		  ["box", "200.", "0.", "200."],["translate", "0.", "30.", "0."]];
 //Coordinate Transform aRraY
 
-var movespeed=1;
-var eye={pos:[0,0,0],speed:0,strafespeed:0,
+var movespeed=0.1;
+var eye={pos:[0,-20,-40],speed:0,strafespeed:0,
 	xang:0,yang:0,zang:0,
 	vector:[],hvec:[],vvec:[],
 	getVectors(){
@@ -111,24 +127,24 @@ var eye={pos:[0,0,0],speed:0,strafespeed:0,
 }
 function kdown(e){
 	var event=window.event ? window.event : e;
-	
-	if(event.keyCode===37){key.left=true}
-	if(event.keyCode===38){event.preventDefault();key.up=true}
-	if(event.keyCode===39){key.right=true}
-	if(event.keyCode===40){event.preventDefault();key.down=true}
-	if(event.keyCode===32){event.preventDefault();key.space=true}
-	if(event.keyCode===16){event.preventDefault();key.shift=true}
-	if(event.keyCode===65){event.preventDefault();key.a=true}
-	if(event.keyCode===83){event.preventDefault();key.s=true}
-	if(event.keyCode===68){event.preventDefault();key.d=true}
-	if(event.keyCode===87){event.preventDefault();key.w=true}
-	if(event.keyCode===90){event.preventDefault();key.z=true}
-	if(event.keyCode===67){event.preventDefault();key.c=true}
-	if(event.keyCode===69){event.preventDefault();key.e=true}
-	if(event.keyCode===81){event.preventDefault();key.q=true}
-	if(event.keyCode===88){event.preventDefault();key.x=true}
-	if(event.keyCode===50){key.n2=true}
-	
+	if(event.target.tagName.toLowerCase()==="body"){
+		if(event.keyCode===37){event.preventDefault();key.left=true}
+		if(event.keyCode===38){event.preventDefault();key.up=true}
+		if(event.keyCode===39){event.preventDefault();key.right=true}
+		if(event.keyCode===40){event.preventDefault();key.down=true}
+		if(event.keyCode===32){key.space=true}
+		if(event.keyCode===16){key.shift=true}
+		if(event.keyCode===65){key.a=true}
+		if(event.keyCode===83){key.s=true}
+		if(event.keyCode===68){key.d=true}
+		if(event.keyCode===87){key.w=true}
+		if(event.keyCode===90){key.z=true}
+		if(event.keyCode===67){key.c=true}
+		if(event.keyCode===69){key.e=true}
+		if(event.keyCode===81){key.q=true}
+		if(event.keyCode===88){key.x=true}
+		if(event.keyCode===50){key.n2=true}
+	}
 	for(i in key){
 		if(key[i]===true){
 			animate=true;
@@ -137,22 +153,24 @@ function kdown(e){
 }
 function kup(e){
 	var event=window.event ? window.event : e;
-	if(event.keyCode===37){key.left=false}
-	if(event.keyCode===38){key.up=false}
-	if(event.keyCode===39){key.right=false}
-	if(event.keyCode===40){key.down=false}
-	if(event.keyCode===32){key.space=false}
-	if(event.keyCode===16){key.shift=false}
-	if(event.keyCode===65){key.a=false}
-	if(event.keyCode===83){key.s=false}
-	if(event.keyCode===68){key.d=false}
-	if(event.keyCode===87){key.w=false}
-	if(event.keyCode===90){key.z=false}
-	if(event.keyCode===67){key.c=false}
-	if(event.keyCode===69){key.e=false}
-	if(event.keyCode===81){key.q=false}
-	if(event.keyCode===88){key.x=false}
-	if(event.keyCode===50){key.n2=false}
+	if(event.target.tagName.toLowerCase()==="body"){
+		if(event.keyCode===37){key.left=false}
+		if(event.keyCode===38){key.up=false}
+		if(event.keyCode===39){key.right=false}
+		if(event.keyCode===40){key.down=false}
+		if(event.keyCode===32){key.space=false}
+		if(event.keyCode===16){key.shift=false}
+		if(event.keyCode===65){key.a=false}
+		if(event.keyCode===83){key.s=false}
+		if(event.keyCode===68){key.d=false}
+		if(event.keyCode===87){key.w=false}
+		if(event.keyCode===90){key.z=false}
+		if(event.keyCode===67){key.c=false}
+		if(event.keyCode===69){key.e=false}
+		if(event.keyCode===81){key.q=false}
+		if(event.keyCode===88){key.x=false}
+		if(event.keyCode===50){key.n2=false}
+	}
 	
 	animate=false;
 	for(i in key){
@@ -178,6 +196,7 @@ function init(){
 	buildEditor();
 	buildPalette();
 	program = glctx.createProgram();
+	document.getElementById("customtext").value=document.getElementById("saved").innerText;
 	rewriteShaders();
 	draw();
 	frame();
@@ -240,14 +259,14 @@ function mouseDownEvent(e){
 	var clickedModule;
 	if(e.srcElement.classList[0] === "module_label"){
 		clickedModule = e.srcElement.parentElement;
-	}else if(e.srcElement.id === "trashcan"){
-		heldElement = undefined;
-		document.getElementById("mouse_follower").innerHTML="";
 	}
 	if(clickedModule){
 		if(heldElement){
 			if(clickedModule.parentElement.id === "editor"){
 				new1 = document.getElementById("editor").insertBefore(heldElement, clickedModule.nextSibling);
+				heldElement = undefined;
+				document.getElementById("mouse_follower").innerHTML="";
+			}else if(clickedModule.parentElement.id === "palette"){
 				heldElement = undefined;
 				document.getElementById("mouse_follower").innerHTML="";
 			}
@@ -270,28 +289,38 @@ function mouseMoveEvent(e){
 
 	}
 }
-function ModuleType(name,plnInputs, numInputs, primitive){
+//fields for modules
+function ModuleType(name,axisInputs, plnInputs, numInputs, primitive){
 	this.name = name;
+	this.axisInputs = axisInputs;
 	this.plnInputs = plnInputs;
 	this.numInputs = numInputs;
 	this.primitive = primitive;//true for primitives; false for transformations
 }
 var moduleReqs = [];
-moduleReqs.push(new ModuleType("sphere",0,1,true));//r
-moduleReqs.push(new ModuleType("box",0,3,true));//l,w,h
-moduleReqs.push(new ModuleType("translate",0,3,false));//x,y,z
-moduleReqs.push(new ModuleType("rotate",1,1,false));//pln,theta
-moduleReqs.push(new ModuleType("scale",0,3,false));//x,y,z
-moduleReqs.push(new ModuleType("radial",1,2,false));//pln,r,n
+moduleReqs.push(new ModuleType("sphere",0,0,1,true));//r
+moduleReqs.push(new ModuleType("box",0,0,3,true));//l,w,h
+moduleReqs.push(new ModuleType("translate",0,0,3,false));//x,y,z
+moduleReqs.push(new ModuleType("rotate",0,1,1,false));//pln,theta
+moduleReqs.push(new ModuleType("scale",0,0,3,false));//x,y,z
+moduleReqs.push(new ModuleType("radial",0,1,2,false));//pln,r,n
+moduleReqs.push(new ModuleType("linear",1,0,1,false));//axis,spacing;
+
 
 function buildModule(ct){
 	var module = document.createElement("div");
 	module.className = "module";
 		for(var m =0; m<moduleReqs.length; m++){
 		if(moduleReqs[m].name == ct[0]){
-			var label = moduleReqs[m].primitive ?  "primitive_label" : "";
-			module.innerHTML = '<span class="module_label '+label+'">'+ct[0]+'</span>';
+			if(moduleReqs[m].primitive){
+				module.classList.add("primitive_module");
+			}
+			module.innerHTML = '<b class="module_label">'+ct[0]+'</b>';
+			
 			var p;
+			for(p=0; p<moduleReqs[m].axisInputs;p++){
+				module.appendChild(axisInputHTML(ct[1+p]));
+			}
 			for(p=0; p<moduleReqs[m].plnInputs;p++){
 				module.appendChild(planeInputHTML(ct[1+p]));
 			}
@@ -313,7 +342,12 @@ function buildEditor(){//build the editor from ctry
 		document.getElementById("editor").appendChild(buildModule(ctry[i]));
 	}
 }
-
+function axisInputHTML(v){
+	var el = document.createElement("select");
+	el.innerHTML ="<option>x</option><option>y</option><option>z</option>";
+	el.value=v;
+	return el;
+}
 function planeInputHTML(v){
 	var el = document.createElement("select");
 	el.innerHTML ="<option>xy</option><option>yz</option><option>zx</option>";
@@ -375,39 +409,51 @@ function rewriteShaders(){
 	var new_txt;
 	if(i_start > 0 && i_end > i_start){
 		new_txt = "\n";
-		for(var i = ctry.length-1;i>0;i--){
+		var shape_count = 0;
+		for(var i = ctry.length-1;i>=0;i--){
 			switch(ctry[i][0]){
 				case "rotate":
 					//(string "xy","yz", etc);(number)
 					//x.xy = rotation_matrix(angle)*x.xy
-					new_txt+="x."+ctry[i][1]+"=rotation_matrix("+ctry[i][2]+")*x."+ctry[i][1]+";\n";
+					new_txt+="x."+ctry[i][1]+"=rotation_matrix("+(ctry[i][2]*Math.PI/180)+")*x."+ctry[i][1]+";\n";
 					break;
 				case "translate":
 					//(number) x3
-					new_txt+="x-=vec3("+ctry[i].slice(1,4)+");";
+					new_txt+="x-=vec3("+ctry[i].slice(1,4)+");\n";
 					break;
 				case "scale":
 					//(number) x3
-					new_txt+="x/=vec3("+ctry[i].slice(1,4)+");"
+					new_txt+="x/=vec3("+ctry[i].slice(1,4)+");\n"
 					break;
 				case "radial":
+					//x.(plane),radius,count; 
 					new_txt+="x."+ctry[i][1]+"=radial(x."+ctry[i].slice(1,4)+");\n";
+					break;
+				case "linear":
+					new_txt+="x."+ctry[i][1]+"=linear_array(x."+ctry[i].slice(1,3)+");\n";
+					break;
+				
+					
+				case "box":
+					shape_count++;
+					new_txt += "float d"+shape_count+"=Dist_Est_Box(x,vec3("+ctry[i].slice(1,4)+"));\n";
+					new_txt += "x=x0;\n";//reset x to remove previous transforms
+					break;
+				case "sphere":
+					shape_count++;
+					new_txt += "float d"+shape_count+"=Dist_Est_Sphere(x,"+ctry[i][1]+");\n";
+					new_txt += "x=x0;\n";
 					break;
 				default:
 					break;
 			}
 		}
-		switch(ctry[0][0]){
-			case "box":
-				new_txt += "float d1=Dist_Est_Box(x,vec3("+ctry[0].slice(1,4)+"));\n";
-				break;
-			case "sphere":
-				new_txt += "float d1=Dist_Est_Sphere(x,"+ctry[0][1]+");\n";
-				break;
-			default:
-				break;
+		new_txt += document.getElementById("customtext").value;
+		var take_minimum = "d0";
+		for(var i=1;i<=shape_count;i++){
+			take_minimum = "min(d"+i+","+take_minimum+")";
 		}
-		
+		new_txt += "d0 = "+take_minimum+";\n";
 		console.log(new_txt);
 		var text_top = old_shader.substring(0,i_start);
 		var text_bot = old_shader.substring(i_end,old_shader.length);
@@ -415,7 +461,7 @@ function rewriteShaders(){
 		document.getElementById("fragment_shader").innerHTML = text_top + new_txt + text_bot;
 		updateShaders();
 	}else{
-		console.log("can't rewrite shader from javascript");
+		console.log("can't rewrite shader from javascript (markers missing)");
 	}
 	console.log(document.getElementById("fragment_shader2").innerHTML.substring(i_start,i_end));
 }
@@ -449,7 +495,7 @@ function rewriteShaders(){
 		return length(x) - r;
 	}
 	float Dist_Est_Box(vec3 x, vec3 r){
-		return length(max(abs(x) - r, vec3(0.0) ));
+		return length(max(abs(x) - r*0.5, vec3(0.0) ));
 	}
 
 	float Dist_Est_Segment( vec3 x){
@@ -468,11 +514,58 @@ function rewriteShaders(){
       length(max(vec3(q.x,q.y,x.z),0.0))+min(max(q.x,max(q.y,x.z)),0.0));
 	}
 
+const vec3 n1 = normalize(vec3(1,0,-1));
+const vec3 n2 = normalize(vec3(0,1,-1));
+const vec3 n3 = normalize(vec3(1,-1,0));
+float Dist_Est_Sponge(vec3 p){
+    float s = 1.;
+    for(int n=0;n < 5;n++) {        
+        //folding
+    	p = abs(p);  
+        p -= 2.*min(0.,dot(p,n1))*n1; 
+        p -= 2.*min(0.,dot(p,n2))*n2; 
+		
+        //scale
+   		p *= 3.; 
+        s /= 3.;
+        //offset
+    	p.z -=  1.;
+    	p.z  = -abs(p.z);
+    	p.z +=  1.;
+		p.x -= 2.;
+		p.y -= 2.;      
+    
+	}
+    return Dist_Est_Box(p,vec3(2))*s;
+}
+
+float Dist_Est_Tetra(vec3 x){
+	vec3 z=x;
+	float Scale = 2.0; 
+	float s = 1.0;	
+
+	for(int i=0;i < 6;i++) {   
+       if(z.x+z.y < 0.){
+		z.xy = -z.yx;
+		}
+       if(z.x+z.z<0.){
+		z.xz = -z.zx;
+		}
+       if(z.y+z.z<0.){
+		z.zy = -z.yz;
+		}
+
+       z = z*Scale - vec3(1.0)*(Scale-1.0);
+	   s/=Scale;
+    }
+	  return (length(z) - 1.) * s;
+}
+
 	mat2 rotation_matrix(float ang){
 		return mat2(cos(ang),-sin(ang), sin(ang),cos(ang));
 	}
-	vec2 radial(in vec2 x, float r, float n){
-		
+	vec2 radial(vec2 x, float r, float n){
+		//rotates vector into sector aligning with + axis of first component
 		float arc = 6.283185307/n;
 		float sector = floor(atan(x.y,x.x)/arc+0.5);
 		float ang = arc*sector;
@@ -480,30 +573,40 @@ function rewriteShaders(){
 		x.x-=r;
 		return x;
 	}
-	// Coordinate Transformation function 
+	float linear_array(float x, float spacing){
+		return mod(x+0.5*spacing,spacing)-0.5*spacing;
+	}
+	vec2 rect_array(vec2 x, vec2 spacing){
+		//moves two x components into 2d box centered at origin, preserving points inside box
+		return mod(x+0.5*spacing,spacing)-0.5*spacing;
+	}
+	vec3 cubic_array(vec3 x, vec3 spacing){
+		//moves x into 3d box
+		return mod(x+0.5*spacing,spacing)-0.5*spacing;
+	}
+
+	float Dist_Est_Custom(vec3 x0){
+		vec3 x=x0;
+		float d0=1./0.;
+		//begin here 0->>
+
+		//<<-0 end here
+		
+		return d0;
+	}
 
 	// final Distance Estimator
 	float DE(vec3 x0){
-	
-		
-		vec3 x=x0;
 
-		//begin here 0->>
-		x.z -= 200.;
-		x.xy=radial(x.xy,120.,8.);
-		//x.xy=rotation_matrix(0.2)*x.xy;
-		
-		x.zx=radial(x.zx,10.,4.);
-		float d1=Dist_Est_Box(x,vec3(2.0,4.0,40.0));
-		//<<-0 end here
-		
-		
-		//d1 = max(d1, length(x-vec3(0.0,0.,420.0))-350.); //clipping with max results in lower than true distance
-		//edge rounding would have to go here, it can't be a module  
+		float d1 = Dist_Est_Custom(x0);
+		//float d2 = Dist_Est_Sponge(x0-vec3(0.,-2.,2.));
+		//float d3 = Dist_Est_Tetra(x0-vec3(0.,0.,20.));
+		vec3 x4 = x0;
+		//d1 = min(min(d1,d2),d3);
 		return d1;
 	}
 	
-	vec3 frac_normal(vec3 pos, float ds){
+	vec3 surf_normal(vec3 pos, float ds){
 		return normalize(vec3(
 			DE(pos+vec3(ds,0.0,0.0))-DE(pos-vec3(ds,0.0,0.0)),
 			DE(pos+vec3(0.0,ds,0.0))-DE(pos-vec3(0.0,ds,0.0)),
@@ -532,7 +635,7 @@ function rewriteShaders(){
 				if(step_dist<min_step_dist){
 					rgba = vec4(.6-float(i)/float(max_ray_steps),0.4-float(i)/float(max_ray_steps),1.-float(i)/float(max_ray_steps),1.);
 					
-					vec3 n = frac_normal(p,step_dist);
+					vec3 n = surf_normal(p,step_dist);
 					vel = vel - 2.*dot(vel,n)*n;
 					ray_start = p + 1.*min_step_dist*n;
 					
@@ -546,6 +649,9 @@ function rewriteShaders(){
 		gl_FragColor = rgba;
 		}
 		
+</script>
+<script id="saved">
+
 </script>
 </body>
 </html>
