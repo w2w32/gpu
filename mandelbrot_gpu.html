@@ -1,0 +1,314 @@
+<!doctype HTML>
+<html>
+<head>
+<style>
+div{
+color:#fff;
+}
+canvas{
+position:relative;
+}
+#can0{
+border:2px solid #333;
+}
+</style>
+</style>
+</head>
+<body bgcolor="#000" onload = "init()">
+
+<canvas width="800" height="800" id="can0">
+
+</canvas>
+
+<div id="renderer"></div>
+<div id="mouse_follower"></div>
+<script type="text/javascript">
+var can0, glctx;
+var program;
+var key={up:false,down:false,left:false,right:false,space:false,shift:false,a:false,s:false,w:false,z:false,x:false,n2:false,m1:false};
+var animate;
+
+var ctr_pos = [0,0,4];
+var movespeed=0.0002;
+var eye={pos:[0,0,1],speed:0,strafespeed:0,
+	xang:0,yang:0,zang:0,
+	vector:[],hvec:[],vvec:[],
+	getVectors(){
+		this.vector= [Math.sin(this.yang)*Math.cos(this.xang),Math.sin(this.xang), Math.cos(this.yang)*Math.cos(this.xang)];
+		this.hvec=[Math.cos(this.yang),0,-Math.sin(this.yang)];
+		this.vvec=crossProduct(this.vector,this.hvec);
+	},
+	move(){
+		if(key.w){
+			ctr_pos[2] /= 1.01;
+			
+		}else if(key.s){
+			ctr_pos[2] *= 1.01;
+			
+		}else{
+			this.speed=0;
+		}
+		if(key.a && !key.d){
+			eye.pos[0] -= movespeed;
+		}else if (key.d){
+			eye.pos[0] += movespeed;
+		}else{
+			this.strafespeed=0;
+		}
+		if(key.q){
+			eye.pos[1] -= movespeed;
+		}
+		if(key.e){
+			eye.pos[1] += movespeed;
+		}
+		if(key.x){
+			this.vector[0]++;
+		}
+		if(key.n2){
+			this.vector[0]--;
+		}
+
+		this.pos[0]+=eye.speed*Math.sin(eye.yang)*Math.cos(eye.xang) + eye.strafespeed*Math.cos(eye.yang);
+		this.pos[1]+=eye.speed*Math.sin(eye.xang);
+		this.pos[2]+=eye.speed*Math.cos(eye.yang)*Math.cos(eye.xang) - eye.strafespeed*Math.sin(eye.yang);
+
+	}
+}
+function unstopAnimation(){
+		for(i in key){
+		if(key[i]){
+			animate=true;
+		}
+	}
+}
+function kdown(e){
+	var event=window.event ? window.event : e;
+	if(event.target.tagName.toLowerCase()==="body"){
+		
+		if(event.keyCode===37){event.preventDefault();key.left=true}
+		if(event.keyCode===38){event.preventDefault();key.up=true}
+		if(event.keyCode===39){event.preventDefault();key.right=true}
+		if(event.keyCode===40){event.preventDefault();key.down=true}
+		if(event.keyCode===32){key.space=true}
+		if(event.keyCode===16){key.shift=true}
+		if(event.keyCode===65){key.a=true}
+		if(event.keyCode===83){key.s=true}
+		if(event.keyCode===68){key.d=true}
+		if(event.keyCode===87){key.w=true}
+		if(event.keyCode===90){key.z=true}
+		if(event.keyCode===67){key.c=true}
+		if(event.keyCode===69){key.e=true}
+		if(event.keyCode===81){key.q=true}
+		if(event.keyCode===88){key.x=true}
+		if(event.keyCode===50){key.n2=true}
+	}
+
+	unstopAnimation();
+}
+function kup(e){
+	
+	var event=window.event ? window.event : e;
+	if(event.target.tagName.toLowerCase()==="body"){
+		if(event.keyCode===37){key.left=false}
+		if(event.keyCode===38){key.up=false}
+		if(event.keyCode===39){key.right=false}
+		if(event.keyCode===40){key.down=false}
+		if(event.keyCode===32){key.space=false}
+		if(event.keyCode===16){key.shift=false}
+		if(event.keyCode===65){key.a=false}
+		if(event.keyCode===83){key.s=false}
+		if(event.keyCode===68){key.d=false}
+		if(event.keyCode===87){key.w=false}
+		if(event.keyCode===90){key.z=false}
+		if(event.keyCode===67){key.c=false}
+		if(event.keyCode===69){key.e=false}
+		if(event.keyCode===81){key.q=false}
+		if(event.keyCode===88){key.x=false}
+		if(event.keyCode===50){key.n2=false}
+	}
+	
+	animate=false;
+	unstopAnimation();
+}
+function crossProduct(u,v){
+return [u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
+}
+function init(){
+	document.addEventListener("keydown",kdown);
+	document.addEventListener("keyup",kup);
+	
+	
+	can0 = document.getElementById("can0");
+	can0.addEventListener("mousedown",mouseDownEvent);
+	can0.addEventListener("mouseup",mouseUpEvent);
+	can0.addEventListener("mouseleave",mouseUpEvent);
+	can0.addEventListener("mousemove",mouseMoveEvent);
+	glctx=can0.getContext("webgl2");
+	document.getElementById("renderer").innerText=(glctx.getParameter(glctx.getExtension("WEBGL_debug_renderer_info").UNMASKED_RENDERER_WEBGL));
+	glctx.viewport(0,0,glctx.drawingBufferWidth, glctx.drawingBufferHeight);
+
+	program = glctx.createProgram();
+	updateShaders();
+	draw();
+	frame();
+}
+function draw(){
+	eye.getVectors();
+	
+	glctx.clearColor(0, 0, 0, 1.0);
+	glctx.clear(glctx.COLOR_BUFFER_BIT);
+	
+	updateUniforms();
+	glctx.drawArrays(glctx.POINTS, 0, 1);
+}
+function updateShaders(){
+	var vertex = glctx.createShader(glctx.VERTEX_SHADER);
+	glctx.shaderSource(vertex, document.getElementById("vertex_shader").innerHTML);
+	glctx.compileShader(vertex);
+	
+	var fragment = glctx.createShader(glctx.FRAGMENT_SHADER);
+	
+	glctx.shaderSource(fragment, document.getElementById("fragment_shader").innerHTML);
+	glctx.compileShader(fragment);
+	
+	glctx.attachShader(program, vertex);
+	glctx.attachShader(program, fragment);
+	glctx.linkProgram(program);
+	
+	console.log(glctx.getProgramInfoLog(program));
+
+	glctx.useProgram(program);
+	
+	updateUniforms();
+	
+	glctx.detachShader(program, vertex);
+	glctx.detachShader(program, fragment);
+	glctx.deleteShader(vertex);
+	glctx.deleteShader(fragment);
+}
+
+function updateUniforms(){
+	glctx.uniform3fv(glctx.getUniformLocation(program,"position"), ctr_pos);
+	glctx.uniform3fv(glctx.getUniformLocation(program,"epos"), eye.pos);
+	glctx.uniformMatrix3fv(glctx.getUniformLocation(program,"color"), false, [0,1,0.1, 0,1,0, 1,0.5,0]);
+
+}
+var framecount=0;
+function frame(){
+	if(animate){
+		eye.move();
+		if(framecount%1===0){
+			draw();
+		}
+	}
+	framecount=requestAnimationFrame(frame);
+}
+
+var clicked_pos = [0,0];
+var last_ctr = [0,0];
+function mouseDownEvent(e){
+	clicked_pos = [e.offsetX,e.offsetY];
+	key.m1=true;
+	animate=true;
+	
+}
+function mouseUpEvent(e){
+	last_ctr[0] = ctr_pos[0];
+	last_ctr[1] = ctr_pos[1];
+	key.m1 = false;
+	unstopAnimation();
+
+}
+function mouseMoveEvent(e){
+	if(key.m1){
+		ctr_pos[0]=last_ctr[0]+ctr_pos[2]*(e.offsetX-clicked_pos[0])/(800);
+		ctr_pos[1]=last_ctr[1]+ctr_pos[2]*(e.offsetY-clicked_pos[1])/(800);
+	}
+	unstopAnimation();
+}
+
+</script>
+<script type="text/webgl" id="vertex_shader">
+	precision highp float;
+	
+	void main() {
+		gl_Position = vec4(0., 0., 0.0, 1.0);
+		gl_PointSize = 800.;
+	}
+</script>
+<script type="text/webgl" id="fragment_shader">
+	precision mediump float;
+
+	const float pi = 3.14159265;
+	
+	uniform vec3 position;
+	uniform vec3 epos;
+	uniform vec3 color;
+	
+	vec2 cmult(vec2 a, vec2 b){
+		return vec2(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x);
+	}
+	
+	void main() {
+		vec4 rgba = vec4(0.0,0.,0.,1.);
+		
+		vec2 p = position.z*(gl_PointCoord-0.5) - position.xy;
+		float ang = atan(p.y,p.x);
+		vec2 fxy = cmult(p,p);
+		fxy = cmult(p,fxy)-vec2(4.,0.);
+		//rgba.xy = abs(fxy);
+		
+		vec4 divg = vec4(0.0);
+		float cutoff = 20.0;
+		vec2 z0 = epos.xy;
+		vec2 z = z0;
+		//float dp = position.z/(800.);
+		
+		float i=0.;
+		for(int ii=0;ii<200;ii++){
+			z = cmult(z,z) + p;
+			
+			if(dot(z,z)>cutoff*cutoff){
+			//if(z.x>0.){
+				break;
+			}
+			i += 1.;
+		}
+		i += -log2(log2(dot(z,z))) + 4.0;
+		
+		/*
+		z = z0;
+		for(int i=0;i<200;i++){
+			z = cmult(z,z) + p + vec2(dp,0);
+			if(length(z)<cutoff){
+				divg.y ++;
+			}
+		}
+		
+		z = z0;
+		for(int i=0;i<200;i++){
+			z = cmult(z,z) + p + vec2(0,dp);
+			if(length(z)<cutoff){
+				divg.z ++;
+			}
+		}
+		
+		z = z0;
+		for(int i=0;i<200;i++){
+			z = cmult(z,z) + p + vec2(dp,dp);
+			if(length(z)<cutoff){
+				divg.w ++;
+			}
+		}
+		*/
+		divg = vec4(2.0,1.0,1.0,0.0)*i;
+		rgba = 0.5+0.5*sin(divg*0.5);
+
+		
+		gl_FragColor = rgba;
+	}
+		
+</script>
+
+</body>
+</html>
