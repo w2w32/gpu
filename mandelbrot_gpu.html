@@ -256,13 +256,11 @@ function mouseMoveEvent(e){
 		float ang = atan(p.y,p.x);
 		vec2 fxy = cmult(p,p);
 		fxy = cmult(p,fxy)-vec2(4.,0.);
-		//rgba.xy = abs(fxy);
 		
 		vec4 divg = vec4(0.0);
 		float cutoff = 20.0;
 		vec2 z0 = epos.xy;
 		vec2 z = z0;
-		//float dp = position.z/(800.);
 		
 		float i=0.;
 		for(int ii=0;ii<256;ii++){
